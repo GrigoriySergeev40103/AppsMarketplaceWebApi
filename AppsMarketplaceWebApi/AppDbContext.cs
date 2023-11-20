@@ -3,13 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AppsMarketplaceWebApi
 {
-	public class AppDbContext : IdentityDbContext<User>
+	public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<User>(options)
 	{
-		public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-		{
-
-		}
-
 		protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		{
 			base.OnConfiguring(optionsBuilder);
