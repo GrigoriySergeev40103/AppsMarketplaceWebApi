@@ -11,7 +11,8 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
 builder.Services.AddAuthorizationBuilder();
 
 builder.Services.AddDbContext<AppDbContext>(
-	options => options.UseInMemoryDatabase("AppDb"));
+	options => options.UseMySql("server=127.0.0.1;port=3306;user=root;password=sdas13Lc30589z[1;database=app_market",
+				ServerVersion.AutoDetect("server=127.0.0.1;port=3306;user=root;password=sdas13Lc30589z[1;database=app_market")));
 
 builder.Services.AddIdentityCore<User>()
 	.AddEntityFrameworkStores<AppDbContext>()
