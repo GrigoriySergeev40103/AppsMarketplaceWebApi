@@ -10,9 +10,16 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
 	.AddIdentityCookies();
 builder.Services.AddAuthorizationBuilder();
 
+string? connectionStr = builder.Configuration.GetConnectionString("DefaultConnection");
+if (connectionStr == null)
+{
+	Console.WriteLine("Couldn't find a mysql database connection string in appsettings.json");
+	return;
+}
+
 builder.Services.AddDbContext<AppDbContext>(
-	options => options.UseMySql("server=127.0.0.1;port=3306;user=root;password=sdas13Lc30589z[1;database=app_market",
-				ServerVersion.AutoDetect("server=127.0.0.1;port=3306;user=root;password=sdas13Lc30589z[1;database=app_market")));
+	options => options.UseMySql(connectionStr, ServerVersion.AutoDetect(connectionStr))
+	);
 
 builder.Services.AddIdentityCore<User>()
 	.AddEntityFrameworkStores<AppDbContext>()
