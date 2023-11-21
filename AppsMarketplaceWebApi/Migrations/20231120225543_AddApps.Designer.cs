@@ -3,6 +3,7 @@ using System;
 using AppsMarketplaceWebApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AppsMarketplaceWebApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20231120225543_AddApps")]
+    partial class AddApps
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,19 +58,6 @@ namespace AppsMarketplaceWebApi.Migrations
                     b.HasKey("AppId");
 
                     b.ToTable("Apps");
-                });
-
-            modelBuilder.Entity("AppsMarketplaceWebApi.Models.AppsOwnershipInfo", b =>
-                {
-                    b.Property<int>("AppId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("AppId", "UserId");
-
-                    b.ToTable("AppsOwnershipInfos");
                 });
 
             modelBuilder.Entity("AppsMarketplaceWebApi.User", b =>
