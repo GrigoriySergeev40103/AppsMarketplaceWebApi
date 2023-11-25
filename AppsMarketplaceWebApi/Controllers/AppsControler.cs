@@ -10,10 +10,10 @@ namespace AppsMarketplaceWebApi.Controllers
 {
 	[Route("api/[controller]")]
 	[ApiController]
-	public class AppsControler(AppDbContext dbContext, UserManager<IdentityUser> userManager) : ControllerBase
+	public class AppsControler(AppDbContext dbContext, UserManager<User> userManager) : ControllerBase
 	{
 		protected readonly AppDbContext _dbContext = dbContext;
-		protected readonly UserManager<IdentityUser> _userManager = userManager;
+		protected readonly UserManager<User> _userManager = userManager;
 
 		[Authorize]
 		[HttpPost("AcquireAppById")]
@@ -26,7 +26,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				return HttpStatusCode.NotFound;
 			}
 
-			IdentityUser? user = await _userManager.GetUserAsync(User);
+			User? user = await _userManager.GetUserAsync(User);
 
             if (user == null)
             {
@@ -40,8 +40,21 @@ namespace AppsMarketplaceWebApi.Controllers
 			};
 
 			await _dbContext.AppsOwnershipInfos.AddAsync(ownershipInfo);
+			await _dbContext.SaveChangesAsync();
 
 			return HttpStatusCode.OK;
 		}
-	}
+
+		[HttpGet("GetAllApps")]
+		public ActionResult<IEnumerable<App>> GetAllApps()
+		{
+			return _dbContext.Apps;
+		}
+
+   //     [HttpGet("GetAllAppsByCategoryId")]
+   //     public ActionResult<IEnumerable<App>> GetAllAppsByCategoryId(int categoryId)
+   //     {
+			//return _dbContext.Apps.Where(app => app.CategoryId == categoryId).AsEnumerable();
+   //     }
+    }
 }

@@ -1,6 +1,7 @@
 using AppsMarketplaceWebApi;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
 using tusdotnet;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +32,15 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsAllowAll",
+    builder =>
+    {
+        builder.WithOrigins().AllowAnyHeader().WithMethods("GET, PATCH, DELETE, PUT, POST, OPTIONS");
+    });
+});
 
 var app = builder.Build();
 
@@ -68,6 +78,13 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+// so we can call it from localhost? (without it couldn't fetch data from blazor app running on localhost)
+app.UseCors(x => x
+   .AllowAnyMethod()
+   .AllowAnyHeader()
+   .SetIsOriginAllowed(origin => true) // allow any origin  
+   .AllowCredentials());               // allow credentials 
 
 app.MapControllers();
 

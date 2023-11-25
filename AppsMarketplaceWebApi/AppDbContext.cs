@@ -8,6 +8,7 @@ namespace AppsMarketplaceWebApi
 	{
 		public DbSet<App> Apps { get; set; }
 		public DbSet<AppsOwnershipInfo> AppsOwnershipInfos { get; set; }
+		public DbSet<AppCategory> AppCategories { get; set; }
 
 		protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		{
