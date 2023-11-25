@@ -33,15 +33,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsAllowAll",
-    builder =>
-    {
-        builder.WithOrigins().AllowAnyHeader().WithMethods("GET, PATCH, DELETE, PUT, POST, OPTIONS");
-    });
-});
-
 var app = builder.Build();
 
 app.MapIdentityApi<User>();
