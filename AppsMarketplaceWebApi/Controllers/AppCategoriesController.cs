@@ -45,9 +45,9 @@ namespace AppsMarketplaceWebApi.Controllers
         }
 
         [HttpGet("GetAppCategories")]
-        public List<AppCategory> GetAppCategories()
+        public IEnumerable<AppCategory> GetAppCategories()
         {
-            return _dbContext.AppCategories.ToList();
+            return _dbContext.AppCategories;
         }
     }
 }
