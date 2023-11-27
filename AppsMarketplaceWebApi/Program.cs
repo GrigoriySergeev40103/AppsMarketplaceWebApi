@@ -1,6 +1,9 @@
 using AppsMarketplaceWebApi;
 using AppsMarketplaceWebApi.Models;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
 using System.Text;
@@ -38,6 +41,18 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+	options.Limits.MaxRequestBodySize = long.MaxValue; // if don't set default value is: 30 MB
+});
+
+builder.Services.Configure<FormOptions>(x =>
+{
+	x.ValueLengthLimit = int.MaxValue;
+	x.MultipartBodyLengthLimit = long.MaxValue; // if don't set default value is: 128 MB
+	x.MultipartHeadersLengthLimit = int.MaxValue;
+});
+
 var app = builder.Build();
 
 app.MapIdentityApi<User>();
@@ -47,7 +62,7 @@ app.Map("/promote", async (HttpContext httpContext, RoleManager<IdentityRole> ro
 	await userManager.AddToRoleAsync((await userManager.GetUserAsync(httpContext.User))!, "Admin");
 }).RequireAuthorization();
 
-app.MapTus("/files", async httpContext => new()
+app.MapTus("/files", async (httpContext) => new()
 {
 	// This method is called on each request so different configurations can be returned per user, domain, path etc.
 	// Return null to disable tusdotnet for the current request.
