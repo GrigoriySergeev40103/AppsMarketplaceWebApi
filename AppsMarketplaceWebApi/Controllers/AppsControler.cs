@@ -46,9 +46,14 @@ namespace AppsMarketplaceWebApi.Controllers
 		}
 
 		[HttpGet("GetAllApps")]
-		public ActionResult<IEnumerable<App>> GetAllApps()
+		public async IAsyncEnumerable<App> GetAllApps()
 		{
-			return _dbContext.Apps;
+			IAsyncEnumerable<App> apps = _dbContext.Apps.AsNoTracking().AsAsyncEnumerable();
+
+			await foreach (App app in apps)
+			{
+				yield return app;
+			}
 		}
 
    //     [HttpGet("GetAllAppsByCategoryId")]
