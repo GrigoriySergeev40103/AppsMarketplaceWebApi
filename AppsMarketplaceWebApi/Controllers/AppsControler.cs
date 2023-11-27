@@ -17,20 +17,20 @@ namespace AppsMarketplaceWebApi.Controllers
 
 		[Authorize]
 		[HttpPost("AcquireAppById")]
-		public async Task<HttpStatusCode> AcquireAppById(int appId)
+		public async Task<IActionResult> AcquireAppById(int appId)
 		{
 			App? app = await _dbContext.Apps.FirstOrDefaultAsync(s => s.AppId == appId);
 
 			if (app == null)
 			{
-				return HttpStatusCode.NotFound;
+				return NotFound();
 			}
 
 			User? user = await _userManager.GetUserAsync(User);
 
             if (user == null)
             {
-				return HttpStatusCode.BadRequest;
+				return BadRequest();
             }
 
 			AppsOwnershipInfo ownershipInfo = new()
@@ -42,7 +42,7 @@ namespace AppsMarketplaceWebApi.Controllers
 			await _dbContext.AppsOwnershipInfos.AddAsync(ownershipInfo);
 			await _dbContext.SaveChangesAsync();
 
-			return HttpStatusCode.OK;
+			return Ok();
 		}
 
 		[HttpGet("GetAllApps")]

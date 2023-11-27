@@ -41,11 +41,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// So we can accept big files through tus protocol
 builder.Services.Configure<KestrelServerOptions>(options =>
 {
 	options.Limits.MaxRequestBodySize = long.MaxValue; // if don't set default value is: 30 MB
 });
 
+// So we can accept big files through tus protocol
 builder.Services.Configure<FormOptions>(x =>
 {
 	x.ValueLengthLimit = int.MaxValue;
@@ -57,6 +59,7 @@ var app = builder.Build();
 
 app.MapIdentityApi<User>();
 
+// Make user an admin(TEMP!!!)
 app.Map("/promote", async (HttpContext httpContext, RoleManager<IdentityRole> roleManager, UserManager<User> userManager) =>
 {
 	await userManager.AddToRoleAsync((await userManager.GetUserAsync(httpContext.User))!, "Admin");
@@ -106,6 +109,7 @@ app.MapTus("/files", async (httpContext) => new()
 			UserManager<User>? userManager = httpContext.RequestServices.GetService<UserManager<User>>();
 			if(userManager == null)
 			{
+				Console.WriteLine("File was uploaded succesfully but couldn't retrieve user manager to identify uploader");
 				await DiscardFile();
 				return;
 			}
@@ -114,55 +118,77 @@ app.MapTus("/files", async (httpContext) => new()
 			User? developer = await userManager.GetUserAsync(eventContext.HttpContext.User);
 			if(developer == null)
 			{
+				Console.WriteLine("File was uploaded succesfully but couldn't retrieve user of the uploaded file");
 				await DiscardFile();
 				return;
 			}
 			toAdd.DeveloperId = developer.Id;
 
 			Metadata? valueData;
-			bool hasData = metadata.TryGetValue("filename", out valueData);
+			string metadataKey = "filename";
+			bool hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 				toAdd.Name = valueData!.GetString(Encoding.UTF8);
 			else
 			{
+				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve filename(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
 			}
-			hasData = metadata.TryGetValue("description", out valueData);
+
+			metadataKey = "description";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 				toAdd.Description = valueData!.GetString(Encoding.UTF8);
 			else
 			{
+				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve description(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
 			}
-			hasData = metadata.TryGetValue("spec_desc", out valueData);
+
+			metadataKey = "spec_desc";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 				toAdd.SpecialDescription = valueData!.GetString(Encoding.UTF8);
 			else
 			{
+				Console.WriteLine("File was uploaded succesfully but couldn't retrieve " +
+					$"special description(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
 			}
-			hasData = metadata.TryGetValue("price", out valueData);
+
+			metadataKey = "price";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 			{
 				bool parsed = int.TryParse(valueData!.GetString(Encoding.UTF8), out int value);
 				if(parsed)
 					toAdd.Price = value;
+				else
+				{
+					Console.WriteLine($"File was uploaded succesfully but couldn't parse price(by key {metadataKey}) from the metadata");
+					await DiscardFile();
+					return;
+				}
 			}
 			else
 			{
+				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve price(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
 			}
-			hasData = metadata.TryGetValue("category_id", out valueData);
+
+			metadataKey = "category_id";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 			{
-				toAdd.CategoryId = int.Parse(valueData.GetString(Encoding.UTF8));
+				toAdd.CategoryId = int.Parse(valueData!.GetString(Encoding.UTF8));
 			}
 			else
 			{
+				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve category id(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
 			}
@@ -177,7 +203,7 @@ app.MapTus("/files", async (httpContext) => new()
 				content.CopyTo(fileStream);
 			}
 
-			toAdd.Path = $"C:\\dev\\AppMarket\\apps\\{toAdd.Name}";
+			toAdd.Path = $"C:\\dev\\AppMarket\\apps\\{file.Id}";
 
 			AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();
 			if (dbContext == null)
@@ -210,9 +236,10 @@ app.UseCors(x => x
    .AllowAnyHeader()
    .SetIsOriginAllowed(origin => true) // allow any origin  
    .AllowCredentials()
+   // So tus also works
    .WithExposedHeaders("Upload-Offset", "Location", "Upload-Length", "Tus-Version",
    "Tus-Resumable", "Tus-Max-Size", "Tus-Extension", "Upload-Metadata", "Upload-Defer-Length",
-   "Upload-Concat", "Location", "Upload-Offset", "Upload-Length"));               // allow credentials 
+   "Upload-Concat", "Location", "Upload-Offset", "Upload-Length"));
 
 app.MapControllers();
 
