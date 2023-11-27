@@ -136,6 +136,17 @@ app.MapTus("/files", async (httpContext) => new()
 				return;
 			}
 
+			metadataKey = "extension";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
+			if (hasData)
+				toAdd.Extension = valueData!.GetString(Encoding.UTF8);
+			else
+			{
+				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve extension(by key {metadataKey}) from the metadata");
+				await DiscardFile();
+				return;
+			}
+
 			metadataKey = "description";
 			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
@@ -194,15 +205,6 @@ app.MapTus("/files", async (httpContext) => new()
 			}
 
 			toAdd.UploadDate = DateTime.UtcNow;
-
-			using Stream content = await file.GetContentAsync(eventContext.CancellationToken);
-
-			using (var fileStream = File.Create($"C:\\dev\\AppMarket\\apps\\{toAdd.Name}"))
-			{
-				content.Seek(0, SeekOrigin.Begin);
-				content.CopyTo(fileStream);
-			}
-
 			toAdd.Path = $"C:\\dev\\AppMarket\\apps\\{file.Id}";
 
 			AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();

@@ -10,6 +10,8 @@
 
 		public string Path { get; set; } = null!;
 
+		public string Extension { get; set; } = null!;
+
 		public DateTime UploadDate { get; set; }
 
 		public decimal Price { get; set; }
