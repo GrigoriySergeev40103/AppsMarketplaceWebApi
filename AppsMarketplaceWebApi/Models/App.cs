@@ -1,8 +1,11 @@
-﻿namespace AppsMarketplaceWebApi.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace AppsMarketplaceWebApi.Models
 {
 	public class App
 	{
-		public int AppId { get; set; }
+		[Key]
+		public string AppId { get; set; } = null!;
 
 		public string DeveloperId { get; set; } = null!;
 

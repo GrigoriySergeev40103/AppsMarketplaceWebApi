@@ -21,7 +21,7 @@ namespace AppsMarketplaceWebApi.Controllers
 
 		[Authorize]
 		[HttpPost("AcquireAppById")]
-		public async Task<IActionResult> AcquireAppById(int appId)
+		public async Task<IActionResult> AcquireAppById(string appId)
 		{
 			App? app = await _dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
@@ -36,7 +36,7 @@ namespace AppsMarketplaceWebApi.Controllers
             {
 				return BadRequest();
             }
-
+			
 			AppsOwnershipInfo ownershipInfo = new()
 			{
 				AppId = appId,
@@ -59,20 +59,21 @@ namespace AppsMarketplaceWebApi.Controllers
 				yield return app;
 			}
 		}
-
+		
 		[Authorize(Roles = "Admin")]
 		[HttpDelete("DeleteAppById")]
-		public async Task<IActionResult> DeleteAppById(int appId)
+		public async Task<IActionResult> DeleteAppById(string appId)
 		{
 			App? toDelete = await _dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
 			if(toDelete == null)
 				return NotFound();
 
-			_dbContext.Apps.Remove(toDelete);
+			TusDiskStore terminationStore = _tusDiskStore;
 
-			var terminationStore = (ITusTerminationStore)_tusDiskStore;
-			//await terminationStore.DeleteFileAsync(toDelete.);
+			await terminationStore.DeleteFileAsync(toDelete.AppId, default);
+
+			_dbContext.Apps.Remove(toDelete);
 
 			await _dbContext.SaveChangesAsync();
 			return Ok();
