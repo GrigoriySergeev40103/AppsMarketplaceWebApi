@@ -11,6 +11,7 @@ using tusdotnet;
 using tusdotnet.Helpers;
 using tusdotnet.Interfaces;
 using tusdotnet.Models;
+using tusdotnet.Stores;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +56,10 @@ builder.Services.Configure<FormOptions>(x =>
 	x.MultipartHeadersLengthLimit = int.MaxValue;
 });
 
+TusDiskStore tusStore = new(@"C:\dev\AppMarket\apps");
+
+builder.Services.AddSingleton(tusStore);
+
 var app = builder.Build();
 
 app.MapIdentityApi<User>();
@@ -71,7 +76,7 @@ app.MapTus("/files", async (httpContext) => new()
 	// Return null to disable tusdotnet for the current request.
 
 	// Where to store data?
-	Store = new tusdotnet.Stores.TusDiskStore(@"C:\dev\AppMarket\apps"),
+	Store = tusStore,
 	Events = new()
 	{
 		OnBeforeCreateAsync = ctx =>

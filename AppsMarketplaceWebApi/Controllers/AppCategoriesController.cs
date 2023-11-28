@@ -31,7 +31,7 @@ namespace AppsMarketplaceWebApi.Controllers
         [HttpDelete("RemoveAppCategoryById")]
         public async Task<HttpStatusCode> RemoveAppCategoryById(int categoryId)
         {
-            AppCategory? category = await _dbContext.AppCategories.FirstOrDefaultAsync(category => category.CategoryId == categoryId);
+            AppCategory? category = await _dbContext.AppCategories.SingleOrDefaultAsync(category => category.CategoryId == categoryId);
 
             if(category == null)
             {
