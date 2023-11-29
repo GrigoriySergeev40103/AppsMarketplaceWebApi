@@ -1,4 +1,5 @@
-﻿using AppsMarketplaceWebApi.Models;
+﻿using AppsMarketplaceWebApi.DTO;
+using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -13,7 +14,7 @@ namespace AppsMarketplaceWebApi.Controllers
 {
 	[Route("api/[controller]")]
 	[ApiController]
-	public class AppsControler(AppDbContext dbContext, UserManager<User> userManager, TusDiskStore tusDiskStore) : ControllerBase
+	public class AppsController(AppDbContext dbContext, UserManager<User> userManager, TusDiskStore tusDiskStore) : ControllerBase
 	{
 		protected readonly AppDbContext _dbContext = dbContext;
 		protected readonly UserManager<User> _userManager = userManager;
@@ -50,13 +51,25 @@ namespace AppsMarketplaceWebApi.Controllers
 		}
 
 		[HttpGet("GetAllApps")]
-		public async IAsyncEnumerable<App> GetAllApps()
+		public async IAsyncEnumerable<AppDTO> GetAllApps()
 		{
 			IAsyncEnumerable<App> apps = _dbContext.Apps.AsNoTracking().AsAsyncEnumerable();
 
+			AppDTO toSend = new();
+
 			await foreach (App app in apps)
 			{
-				yield return app;
+				toSend.AppId = app.AppId;
+				toSend.UploadDate = app.UploadDate;
+				toSend.DeveloperId = app.DeveloperId;
+				toSend.Price = app.Price;
+				toSend.CategoryId = app.CategoryId;
+				toSend.Description = app.Description;
+                toSend.SpecialDescription = app.SpecialDescription;
+                toSend.Name = app.Name;
+                toSend.Extension = app.Extension;
+
+                yield return toSend;
 			}
 		}
 		
