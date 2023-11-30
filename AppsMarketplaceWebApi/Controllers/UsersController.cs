@@ -34,7 +34,7 @@ namespace AppsMarketplaceWebApi.Controllers
         protected readonly LinkGenerator _linkGenerator = linkGenerator;
 
         // We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
-        readonly string? confirmEmailEndpointName = $"{nameof(UsersController)}-ConfirmEmail";
+        const string confirmEmailEndpointName = $"{nameof(UsersController)}-ConfirmEmail";
 
         protected readonly AppDbContext _dbContext = dbContext;
         protected readonly UserManager<User> _userManager = userManager;
@@ -124,7 +124,7 @@ namespace AppsMarketplaceWebApi.Controllers
             return TypedResults.SignIn(newPrincipal, authenticationScheme: IdentityConstants.BearerScheme);
         }
 
-        [EndpointName($"{nameof(UsersController)}-ConfirmEmail")]
+        [EndpointName(confirmEmailEndpointName)]
         [HttpGet("ConfirmEmail")]
         public async Task<Results<ContentHttpResult, UnauthorizedHttpResult>> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
             [FromQuery] string? changedEmail, [FromServices] UserManager<User> userManager)
