@@ -34,15 +34,15 @@ namespace AppsMarketplaceWebApi.Controllers
         protected readonly LinkGenerator _linkGenerator = linkGenerator;
 
         // We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
-        string? confirmEmailEndpointName = null;
+        readonly string? confirmEmailEndpointName = $"{nameof(UsersController)}-ConfirmEmail";
 
         protected readonly AppDbContext _dbContext = dbContext;
         protected readonly UserManager<User> _userManager = userManager;
 
         //--------------------------------------AUTHENTICATION AND AUTHORIZATION--------------------------------------//
         [HttpPost("Register")]
-        public async Task<Results<Ok, ValidationProblem>> Register([FromBody] RegisterRequest registration,
-            HttpContext context, [FromServices] UserManager<User> userManager, [FromServices] IServiceProvider sp)
+        public async Task<Results<Ok, ValidationProblem>> Register([FromBody] RegisterRequest registration, 
+            [FromServices] UserManager<User> userManager, [FromServices] IServiceProvider sp)
         {
             if (!userManager.SupportsUserEmail)
             {
@@ -59,6 +59,7 @@ namespace AppsMarketplaceWebApi.Controllers
             }
 
             var user = new User();
+            user.PathToAvatarPic = "C:\\dev\\AppMarket\\images\\defaults\\profile_png.png";
             await userStore.SetUserNameAsync(user, email, CancellationToken.None);
             await emailStore.SetEmailAsync(user, email, CancellationToken.None);
             var result = await userManager.CreateAsync(user, registration.Password);
@@ -68,7 +69,7 @@ namespace AppsMarketplaceWebApi.Controllers
                 return CreateValidationProblem(result);
             }
 
-            await SendConfirmationEmailAsync(user, userManager, context, email);
+            await SendConfirmationEmailAsync(user, userManager, HttpContext, email);
             return TypedResults.Ok();
         }
 
@@ -123,7 +124,7 @@ namespace AppsMarketplaceWebApi.Controllers
             return TypedResults.SignIn(newPrincipal, authenticationScheme: IdentityConstants.BearerScheme);
         }
 
-        // Not fully copied from map identity(perhaps missing something important, but since endpoint is currently unused left it like that)
+        [EndpointName($"{nameof(UsersController)}-ConfirmEmail")]
         [HttpGet("ConfirmEmail")]
         public async Task<Results<ContentHttpResult, UnauthorizedHttpResult>> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
             [FromQuery] string? changedEmail, [FromServices] UserManager<User> userManager)
