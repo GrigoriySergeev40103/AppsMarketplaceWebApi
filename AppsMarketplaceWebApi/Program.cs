@@ -17,10 +17,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
-	.AddIdentityCookies();
-builder.Services.AddAuthorizationBuilder();
+// ------------------------------Configure Tus storage------------------------------//
+IConfigurationSection tusStoreSection = builder.Configuration.GetSection("TusStoreLocation");
 
+if (tusStoreSection.Value == null)
+{
+	Console.WriteLine("Couldn't find the location for tus protocol to store files in. " +
+		"Check if your configuration contains key 'TusStoreLocation' with a value representing location for tus protocol(for example 'C:/tus')");
+	return;
+}
+
+TusDiskStore tusStore = new(tusStoreSection.Value);
+builder.Services.AddSingleton(tusStore);
+// ------------------------------Configure Tus storage------------------------------//
+
+// ------------------------------Configure MySqlDb------------------------------//
 string? connectionStr = builder.Configuration.GetConnectionString("DefaultConnection");
 if (connectionStr == null)
 {
@@ -31,17 +42,25 @@ if (connectionStr == null)
 builder.Services.AddDbContext<AppDbContext>(
 	options => options.UseMySql(connectionStr, ServerVersion.AutoDetect(connectionStr))
 	);
+// ------------------------------Configure MySqlDb------------------------------//
+
+// ------------------------------Configure Authentication and Authorization------------------------------//
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+	.AddIdentityCookies();
+builder.Services.AddAuthorizationBuilder();
 
 builder.Services.AddIdentityCore<User>()
 	.AddRoles<IdentityRole>()
 	.AddEntityFrameworkStores<AppDbContext>()
 	.AddApiEndpoints();
+// ------------------------------Configure Authentication and Authorization------------------------------//
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ------------------------------Configure so it accepts big tus files------------------------------//
 // So we can accept big files through tus protocol
 builder.Services.Configure<KestrelServerOptions>(options =>
 {
@@ -55,10 +74,7 @@ builder.Services.Configure<FormOptions>(x =>
 	x.MultipartBodyLengthLimit = long.MaxValue; // if don't set default value is: 128 MB
 	x.MultipartHeadersLengthLimit = int.MaxValue;
 });
-
-TusDiskStore tusStore = new(@"C:\dev\AppMarket\apps");
-
-builder.Services.AddSingleton(tusStore);
+// ------------------------------Configure so it accepts big tus files------------------------------//
 
 var app = builder.Build();
 
@@ -97,7 +113,7 @@ app.MapTus("/files", async (httpContext) => new()
 			{
 				ctx.FailRequest("price metadata must be specified. ");
 			}
-			
+
 			return Task.CompletedTask;
 		},
 		OnFileCompleteAsync = async eventContext =>
@@ -211,6 +227,22 @@ app.MapTus("/files", async (httpContext) => new()
 				Console.WriteLine($"File was uploaded succesfully but couldn't retrieve category id(by key {metadataKey}) from the metadata");
 				await DiscardFile();
 				return;
+			}
+
+			metadataKey = "app_pic";
+			hasData = metadata.TryGetValue(metadataKey, out valueData);
+			if (hasData)
+			{
+				//string base64String = valueData!.GetString(Encoding.UTF8);
+				//byte[] imgBytes = Convert.FromBase64String(base64String.Split(',')[1]);
+				//string picturePath = $"C:\\dev\\AppMarket\\images\\{toAdd.AppId}";
+				//await File.WriteAllBytesAsync(picturePath, imgBytes);
+				//toAdd.AppPicturePath = picturePath;
+				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_pic.jpg";
+			}
+			else
+			{
+				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_pic.jpg";
 			}
 
 			toAdd.UploadDate = DateTime.UtcNow;

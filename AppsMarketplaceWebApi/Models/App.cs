@@ -11,6 +11,8 @@ namespace AppsMarketplaceWebApi.Models
 
 		public string Name { get; set; } = null!;
 
+		public string AppPicturePath { get;set; } = null!;
+
 		public string Path { get; set; } = null!;
 
 		public string Extension { get; set; } = null!;

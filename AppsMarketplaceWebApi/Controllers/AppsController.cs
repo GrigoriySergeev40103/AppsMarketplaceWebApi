@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting.Internal;
 using System.Net;
 using tusdotnet.Interfaces;
 using tusdotnet.Models.Configuration;
@@ -91,6 +92,43 @@ namespace AppsMarketplaceWebApi.Controllers
 			await _dbContext.SaveChangesAsync();
 			return Ok();
 		}
+
+
+		[Authorize]
+		[HttpPost("UpdateAppImage")]
+		public async Task<IActionResult> UpdateAppImage(string appId, [FromForm] IFormFile file)
+		{
+			App? requestedApp = await _dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
+			if (requestedApp == null)
+				return NotFound();
+
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest();
+
+			if (user.Id != requestedApp.DeveloperId)
+				return Unauthorized();
+
+			string path = $"C:\\dev\\AppMarket\\images\\{appId}.jpg";
+
+			using FileStream stream = new(path, FileMode.Create);
+			await file.CopyToAsync(stream);
+
+			return Ok();
+		}
+
+		[HttpGet("GetAppImage")]
+		public async Task<IActionResult> GetAppImage(string appId)
+		{
+			App? requestedApp = await _dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
+			if (requestedApp == null)
+				return NotFound();
+
+			// TO DO make a check for valid path
+			return PhysicalFile(requestedApp.AppPicturePath, "image/jpg");
+		}
+
 
 		//     [HttpGet("GetAllAppsByCategoryId")]
 		//     public ActionResult<IEnumerable<App>> GetAllAppsByCategoryId(int categoryId)
