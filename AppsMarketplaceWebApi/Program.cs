@@ -78,8 +78,6 @@ builder.Services.Configure<FormOptions>(x =>
 
 var app = builder.Build();
 
-app.MapIdentityApi<User>();
-
 // Make user an admin(TEMP!!!)
 app.Map("/promote", async (HttpContext httpContext, RoleManager<IdentityRole> roleManager, UserManager<User> userManager) =>
 {
@@ -238,11 +236,11 @@ app.MapTus("/files", async (httpContext) => new()
 				//string picturePath = $"C:\\dev\\AppMarket\\images\\{toAdd.AppId}";
 				//await File.WriteAllBytesAsync(picturePath, imgBytes);
 				//toAdd.AppPicturePath = picturePath;
-				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_pic.jpg";
+				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_icon.png";
 			}
 			else
 			{
-				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_pic.jpg";
+				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_icon.png";
 			}
 
 			toAdd.UploadDate = DateTime.UtcNow;
