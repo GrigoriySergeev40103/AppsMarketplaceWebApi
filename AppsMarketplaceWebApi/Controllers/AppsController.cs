@@ -126,7 +126,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				return NotFound();
 
 			// TO DO make a check for valid path
-			return PhysicalFile(requestedApp.AppPicturePath, "image/jpg");
+			return PhysicalFile(requestedApp.AppPicturePath, "image/png");
 		}
 
 
