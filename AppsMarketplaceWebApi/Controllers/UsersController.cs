@@ -368,11 +368,6 @@ namespace AppsMarketplaceWebApi.Controllers
 
         async Task SendConfirmationEmailAsync(User user, UserManager<User> userManager, HttpContext context, string email, bool isChange = false)
         {
-            if (confirmEmailEndpointName is null)
-            {
-                throw new NotSupportedException("No email confirmation endpoint was registered!");
-            }
-
             var code = isChange
                 ? await userManager.GenerateChangeEmailTokenAsync(user, email)
                 : await userManager.GenerateEmailConfirmationTokenAsync(user);
@@ -473,8 +468,11 @@ namespace AppsMarketplaceWebApi.Controllers
                 return NotFound();
             }
 
-            // TO DO make a check for valid path
-            return PhysicalFile("C:\\dev\\AppMarket\\images\\defaults\\profile_png.png", "image/png");
+            bool avatarExists = System.IO.File.Exists(user.PathToAvatarPic);
+            if (!avatarExists)
+                NotFound();
+
+            return PhysicalFile(user.PathToAvatarPic, "image/png");
         }
 
         //[Authorize]
