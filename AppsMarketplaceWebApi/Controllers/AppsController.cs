@@ -15,11 +15,13 @@ namespace AppsMarketplaceWebApi.Controllers
 {
 	[Route("api/[controller]")]
 	[ApiController]
-	public class AppsController(AppDbContext dbContext, UserManager<User> userManager, TusDiskStore tusDiskStore) : ControllerBase
+	public class AppsController(AppDbContext dbContext, UserManager<User> userManager, 
+		TusDiskStore tusDiskStore, IConfiguration configuration) : ControllerBase
 	{
 		protected readonly AppDbContext _dbContext = dbContext;
 		protected readonly UserManager<User> _userManager = userManager;
 		protected readonly TusDiskStore _tusDiskStore = tusDiskStore;
+		protected readonly IConfiguration _configuration = configuration;
 
 		[Authorize]
 		[HttpPost("AcquireAppById")]
@@ -85,7 +87,9 @@ namespace AppsMarketplaceWebApi.Controllers
 
 			TusDiskStore terminationStore = _tusDiskStore;
 
+			// should probably add exception handling here
 			await terminationStore.DeleteFileAsync(toDelete.AppId, default);
+			System.IO.File.Delete(toDelete.AppPicturePath);
 
 			_dbContext.Apps.Remove(toDelete);
 
@@ -110,7 +114,11 @@ namespace AppsMarketplaceWebApi.Controllers
 			if (user.Id != requestedApp.DeveloperId)
 				return Unauthorized();
 
-			string path = $"C:\\dev\\AppMarket\\images\\{appId}.png";
+			string? imagesPath = _configuration.GetSection("ImageStore").Value;
+			if (imagesPath == null)
+				return Problem(statusCode: 500);
+
+			string path = imagesPath + $"\\{appId}.png";
 
 			using FileStream stream = new(path, FileMode.Create);
 			await file.CopyToAsync(stream);

@@ -23,7 +23,8 @@ namespace AppsMarketplaceWebApi.Controllers
 	[Route("api/[controller]")]
 	[ApiController]
 	public class AuthController(AppDbContext dbContext, UserManager<User> userManager, TimeProvider timeProvider,
-		IOptionsMonitor<BearerTokenOptions> bearerTokenOptions, IEmailSender<User> emailSender, LinkGenerator linkGenerator) : ControllerBase
+		IOptionsMonitor<BearerTokenOptions> bearerTokenOptions, IEmailSender<User> emailSender, 
+		LinkGenerator linkGenerator, IConfiguration configuration) : ControllerBase
 	{
 		// Validate the email address using DataAnnotations like the UserValidator does when RequireUniqueEmail = true.
 		private static readonly EmailAddressAttribute _emailAddressAttribute = new();
@@ -32,6 +33,8 @@ namespace AppsMarketplaceWebApi.Controllers
 		protected readonly IOptionsMonitor<BearerTokenOptions> _bearerTokenOptions = bearerTokenOptions;
 		protected readonly IEmailSender<User> _emailSender = emailSender;
 		protected readonly LinkGenerator _linkGenerator = linkGenerator;
+
+		protected readonly IConfiguration _configuration = configuration;
 
 		// We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
 		const string confirmEmailEndpointName = $"{nameof(AuthController)}-ConfirmEmail";
@@ -42,7 +45,7 @@ namespace AppsMarketplaceWebApi.Controllers
 		#region AUTHENTICATION AND AUTHORIZATION
 		//--------------------------------------AUTHENTICATION AND AUTHORIZATION--------------------------------------//
 		[HttpPost("Register")]
-		public async Task<Results<Ok, ValidationProblem>> Register([FromBody] RegisterRequest registration,
+		public async Task<Results<Ok, ValidationProblem, ProblemHttpResult>> Register([FromBody] RegisterRequest registration,
 			[FromServices] UserManager<User> userManager, [FromServices] IServiceProvider sp)
 		{
 			if (!userManager.SupportsUserEmail)
@@ -59,8 +62,14 @@ namespace AppsMarketplaceWebApi.Controllers
 				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(email)));
 			}
 
-			var user = new User();
-			user.PathToAvatarPic = "C:\\dev\\AppMarket\\images\\defaults\\profile_png.png";
+			User user = new();
+
+			string? pathToAvatarPic = _configuration.GetSection("DefaultUserAvatarPath").Value;
+			if (pathToAvatarPic == null)
+				return TypedResults.Problem(statusCode: 500);
+
+			user.PathToAvatarPic = pathToAvatarPic;
+
 			await userStore.SetUserNameAsync(user, email, CancellationToken.None);
 			await emailStore.SetEmailAsync(user, email, CancellationToken.None);
 			var result = await userManager.CreateAsync(user, registration.Password);
