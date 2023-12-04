@@ -256,6 +256,8 @@ app.MapTus("/files", async (httpContext) => new()
 
  			await dbContext.Apps.AddAsync(toAdd);
 			await dbContext.SaveChangesAsync();
+
+			eventContext.HttpContext.Response.Headers.Append("AppId", toAdd.AppId);
 		}
 	}
 });
@@ -280,7 +282,9 @@ app.UseCors(x => x
    // So tus also works
    .WithExposedHeaders("Upload-Offset", "Location", "Upload-Length", "Tus-Version",
    "Tus-Resumable", "Tus-Max-Size", "Tus-Extension", "Upload-Metadata", "Upload-Defer-Length",
-   "Upload-Concat", "Location", "Upload-Offset", "Upload-Length"));
+   "Upload-Concat", "Location", "Upload-Offset", "Upload-Length", 
+   // AppId for communicating back the Id of an app uploaded with tus
+   "AppId"));
 
 app.MapControllers();
 

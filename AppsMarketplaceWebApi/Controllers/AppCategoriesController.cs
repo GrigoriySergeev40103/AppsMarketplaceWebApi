@@ -1,4 +1,5 @@
-﻿using AppsMarketplaceWebApi.Models;
+﻿using AppsMarketplaceWebApi.DTO;
+using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -29,25 +30,30 @@ namespace AppsMarketplaceWebApi.Controllers
 
         [Authorize(Roles = "Admin")]
         [HttpDelete("RemoveAppCategoryById")]
-        public async Task<HttpStatusCode> RemoveAppCategoryById(int categoryId)
+        public async Task<IActionResult> RemoveAppCategoryById(int categoryId)
         {
             AppCategory? category = await _dbContext.AppCategories.SingleOrDefaultAsync(category => category.CategoryId == categoryId);
 
             if(category == null)
             {
-                return HttpStatusCode.NotFound;
+                return NotFound();
             }
 
             _dbContext.AppCategories.Remove(category);
 
             await _dbContext.SaveChangesAsync();
-            return HttpStatusCode.OK;
+            return Ok();
         }
 
         [HttpGet("GetAppCategories")]
-        public IEnumerable<AppCategory> GetAppCategories()
+        public async IAsyncEnumerable<AppCategory> GetAppCategories()
         {
-            return _dbContext.AppCategories;
+            IAsyncEnumerable<AppCategory> categories = _dbContext.AppCategories.AsNoTracking().AsAsyncEnumerable();
+
+            await foreach (AppCategory category in categories)
+            {
+                yield return category;
+            }
         }
     }
 }

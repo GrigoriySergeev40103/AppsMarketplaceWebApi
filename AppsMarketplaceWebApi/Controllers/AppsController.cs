@@ -110,10 +110,13 @@ namespace AppsMarketplaceWebApi.Controllers
 			if (user.Id != requestedApp.DeveloperId)
 				return Unauthorized();
 
-			string path = $"C:\\dev\\AppMarket\\images\\{appId}.jpg";
+			string path = $"C:\\dev\\AppMarket\\images\\{appId}.png";
 
 			using FileStream stream = new(path, FileMode.Create);
 			await file.CopyToAsync(stream);
+
+			requestedApp.AppPicturePath = path;
+			await _dbContext.SaveChangesAsync();
 
 			return Ok();
 		}
@@ -128,12 +131,5 @@ namespace AppsMarketplaceWebApi.Controllers
 			// TO DO make a check for valid path
 			return PhysicalFile(requestedApp.AppPicturePath, "image/png");
 		}
-
-
-		//     [HttpGet("GetAllAppsByCategoryId")]
-		//     public ActionResult<IEnumerable<App>> GetAllAppsByCategoryId(int categoryId)
-		//     {
-		//return _dbContext.Apps.Where(app => app.CategoryId == categoryId).AsEnumerable();
-		//     }
 	}
 }
