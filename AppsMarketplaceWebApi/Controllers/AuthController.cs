@@ -64,11 +64,27 @@ namespace AppsMarketplaceWebApi.Controllers
 
 			User user = new();
 
-			string? pathToAvatarPic = _configuration.GetSection("DefaultUserAvatarPath").Value;
-			if (pathToAvatarPic == null)
+			string? pathToDefaultAvatarPic = _configuration.GetSection("DefaultUserAvatarPath").Value;
+			if (pathToDefaultAvatarPic == null)
 				return TypedResults.Problem(statusCode: 500);
 
-			user.PathToAvatarPic = pathToAvatarPic;
+			string? pathToImagesDir = _configuration.GetSection("ImageStore").Value;
+			if (pathToImagesDir == null)
+				return TypedResults.Problem(statusCode: 500);
+
+			string pathToAvatar = pathToImagesDir + $"/{user.Id}.png";
+
+			try
+			{
+				// Perhaps should make sure to check if it will get created by User manager first?
+				System.IO.File.Copy(pathToDefaultAvatarPic, pathToAvatar);
+			}
+			catch (Exception)
+			{
+				return TypedResults.Problem(statusCode: 500);
+			}
+
+			user.PathToAvatarPic = pathToAvatar;
 
 			await userStore.SetUserNameAsync(user, email, CancellationToken.None);
 			await emailStore.SetEmailAsync(user, email, CancellationToken.None);

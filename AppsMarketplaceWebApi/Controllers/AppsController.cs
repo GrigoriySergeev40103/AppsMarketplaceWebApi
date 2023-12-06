@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting.Internal;
 using System.Net;
@@ -75,8 +76,32 @@ namespace AppsMarketplaceWebApi.Controllers
                 yield return toSend;
 			}
 		}
-		
-		[Authorize(Roles = "Admin")]
+
+        [HttpGet("GetAppById")]
+        public async Task<IActionResult> GetAppById(string appId)
+        {
+            App? app = await _dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
+
+			if (app == null)
+				return NotFound();
+
+            AppDTO toReturn = new()
+            {
+                AppId = app.AppId,
+                UploadDate = app.UploadDate,
+                DeveloperId = app.DeveloperId,
+                Price = app.Price,
+                CategoryId = app.CategoryId,
+                Description = app.Description,
+                SpecialDescription = app.SpecialDescription,
+                Name = app.Name,
+                Extension = app.Extension
+            };
+
+			return Ok(toReturn);
+        }
+
+        [Authorize(Roles = "Admin")]
 		[HttpDelete("DeleteAppById")]
 		public async Task<IActionResult> DeleteAppById(string appId)
 		{
@@ -120,8 +145,9 @@ namespace AppsMarketplaceWebApi.Controllers
 
 			string path = imagesPath + $"\\{appId}.png";
 
-			using FileStream stream = new(path, FileMode.Create);
-			await file.CopyToAsync(stream);
+			// Will overwrite previous App's picture
+			using FileStream fstream = new(path, FileMode.Create);
+			await file.CopyToAsync(fstream);
 
 			requestedApp.AppPicturePath = path;
 			await _dbContext.SaveChangesAsync();

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.VisualBasic;
 using System.Text;
 using tusdotnet;
@@ -227,21 +228,23 @@ app.MapTus("/files", async (httpContext) => new()
 				return;
 			}
 
-			metadataKey = "app_pic";
-			hasData = metadata.TryGetValue(metadataKey, out valueData);
-			if (hasData)
-			{
-				//string base64String = valueData!.GetString(Encoding.UTF8);
-				//byte[] imgBytes = Convert.FromBase64String(base64String.Split(',')[1]);
-				//string picturePath = $"C:\\dev\\AppMarket\\images\\{toAdd.AppId}";
-				//await File.WriteAllBytesAsync(picturePath, imgBytes);
-				//toAdd.AppPicturePath = picturePath;
-				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_icon.png";
-			}
-			else
-			{
-				toAdd.AppPicturePath = "C:\\dev\\AppMarket\\images\\defaults\\app_icon.png";
-			}
+			//---------------Set app pic---------------//
+			string? pathToDefaultAppPic = builder.Configuration.GetSection("DefaultAppPicPath").Value;
+			if (pathToDefaultAppPic == null)
+				return;
+
+			string? pathToImagesDir = builder.Configuration.GetSection("ImageStore").Value;
+			if (pathToImagesDir == null)
+				return;
+
+			string pathToAppPic = pathToImagesDir + $"/{toAdd.AppId}.png";
+
+			// Copying default app pic instead of pointing to source because
+			// I think it's better than having to check that to be deleted App's pic is default pick or not
+			File.Copy(pathToDefaultAppPic, pathToAppPic);
+
+			toAdd.AppPicturePath = pathToAppPic;
+			//---------------Set app pic---------------//
 
 			toAdd.UploadDate = DateTime.UtcNow;
 			toAdd.Path = $"C:\\dev\\AppMarket\\apps\\{file.Id}";
