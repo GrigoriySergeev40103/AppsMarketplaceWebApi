@@ -22,11 +22,12 @@ namespace AppsMarketplaceWebApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UsersController(AppDbContext dbContext) : ControllerBase
+    public class UsersController(AppDbContext dbContext, UserManager<User> userManager) : ControllerBase
     {
         protected readonly AppDbContext _dbContext = dbContext;
+        protected readonly UserManager<User> _userManager = userManager;
 
-        [HttpGet("GetUserById")]
+		[HttpGet("GetUserById")]
         public async Task<ActionResult<UserDTO>> GetUserById(string userId)
         {
             User? user = await _dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
@@ -45,7 +46,28 @@ namespace AppsMarketplaceWebApi.Controllers
             return Ok(toReturn);
         }
 
-        [HttpGet("GetUserAvatar")]
+        [Authorize]
+		[HttpGet("GetMyself")]
+		public async Task<ActionResult<PersonalUserDTO>> GetMyself()
+		{
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+			{
+				return BadRequest();
+			}
+
+			PersonalUserDTO toReturn = new()
+			{
+				Id = user.Id,
+				UserName = user.UserName,
+                Balance = user.Balance
+			};
+
+			return Ok(toReturn);
+		}
+
+		[HttpGet("GetUserAvatar")]
         public async Task<IActionResult> GetUserAvatar(string userId)
         {
             User? user = await _dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);

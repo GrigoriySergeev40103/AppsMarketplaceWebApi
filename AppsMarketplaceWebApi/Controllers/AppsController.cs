@@ -1,22 +1,16 @@
 ﻿using AppsMarketplaceWebApi.DTO;
 using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting.Internal;
-using System.Net;
-using tusdotnet.Interfaces;
-using tusdotnet.Models.Configuration;
 using tusdotnet.Stores;
 
 namespace AppsMarketplaceWebApi.Controllers
 {
 	[Route("api/[controller]")]
 	[ApiController]
-	public class AppsController(AppDbContext dbContext, UserManager<User> userManager, 
+	public class AppsController(AppDbContext dbContext, UserManager<User> userManager,
 		TusDiskStore tusDiskStore, IConfiguration configuration) : ControllerBase
 	{
 		protected readonly AppDbContext _dbContext = dbContext;
@@ -31,28 +25,65 @@ namespace AppsMarketplaceWebApi.Controllers
 			App? app = await _dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
 			if (app == null)
-			{
 				return NotFound();
-			}
 
 			User? user = await _userManager.GetUserAsync(User);
 
-            if (user == null)
-            {
+			if (user == null)
 				return BadRequest();
-            }
-			
+
 			AppsOwnershipInfo ownershipInfo = new()
 			{
 				AppId = appId,
 				UserId = user.Id
 			};
 
+			bool alreadyOwns = await _dbContext.AppsOwnershipInfos.ContainsAsync(ownershipInfo);
+
+			if (alreadyOwns)
+				return BadRequest("You already own that app");
+
+			if (user.Balance < app.Price)
+				return BadRequest("Not enough money");
+
+			user.Balance -= app.Price;
+
 			await _dbContext.AppsOwnershipInfos.AddAsync(ownershipInfo);
 			await _dbContext.SaveChangesAsync();
 
 			return Ok();
 		}
+
+		[Authorize]
+		[HttpGet("GetMyApps")]
+		public async Task<IActionResult> GetMyApps()
+		{
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest();
+
+			var res = await _dbContext.AppsOwnershipInfos.AsNoTracking().Where(oi => oi.UserId == user.Id).Join
+			(	
+				_dbContext.Apps,
+				oi => oi.AppId, app => app.AppId,
+				(oi, app) => new AppDTO
+				{
+					AppId = app.AppId,
+					UploadDate = app.UploadDate,
+					DeveloperId = app.DeveloperId,
+					Price = app.Price,
+					CategoryId = app.CategoryId,
+					Description = app.Description,
+					SpecialDescription = app.SpecialDescription,
+					Name = app.Name,
+					Extension = app.Extension
+				}
+			).ToArrayAsync();
+
+			return Ok(res);
+		}
+
 
 		[HttpGet("GetAllApps")]
 		public async IAsyncEnumerable<AppDTO> GetAllApps()
@@ -69,45 +100,45 @@ namespace AppsMarketplaceWebApi.Controllers
 				toSend.Price = app.Price;
 				toSend.CategoryId = app.CategoryId;
 				toSend.Description = app.Description;
-                toSend.SpecialDescription = app.SpecialDescription;
-                toSend.Name = app.Name;
-                toSend.Extension = app.Extension;
+				toSend.SpecialDescription = app.SpecialDescription;
+				toSend.Name = app.Name;
+				toSend.Extension = app.Extension;
 
-                yield return toSend;
+				yield return toSend;
 			}
 		}
 
-        [HttpGet("GetAppById")]
-        public async Task<IActionResult> GetAppById(string appId)
-        {
-            App? app = await _dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
+		[HttpGet("GetAppById")]
+		public async Task<IActionResult> GetAppById(string appId)
+		{
+			App? app = await _dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
 
 			if (app == null)
 				return NotFound();
 
-            AppDTO toReturn = new()
-            {
-                AppId = app.AppId,
-                UploadDate = app.UploadDate,
-                DeveloperId = app.DeveloperId,
-                Price = app.Price,
-                CategoryId = app.CategoryId,
-                Description = app.Description,
-                SpecialDescription = app.SpecialDescription,
-                Name = app.Name,
-                Extension = app.Extension
-            };
+			AppDTO toReturn = new()
+			{
+				AppId = app.AppId,
+				UploadDate = app.UploadDate,
+				DeveloperId = app.DeveloperId,
+				Price = app.Price,
+				CategoryId = app.CategoryId,
+				Description = app.Description,
+				SpecialDescription = app.SpecialDescription,
+				Name = app.Name,
+				Extension = app.Extension
+			};
 
 			return Ok(toReturn);
-        }
+		}
 
-        [Authorize(Roles = "Admin")]
+		[Authorize(Roles = "Admin")]
 		[HttpDelete("DeleteAppById")]
 		public async Task<IActionResult> DeleteAppById(string appId)
 		{
 			App? toDelete = await _dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
-			if(toDelete == null)
+			if (toDelete == null)
 				return NotFound();
 
 			TusDiskStore terminationStore = _tusDiskStore;
@@ -158,12 +189,14 @@ namespace AppsMarketplaceWebApi.Controllers
 		[HttpGet("GetAppImage")]
 		public async Task<IActionResult> GetAppImage(string appId)
 		{
-			App? requestedApp = await _dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
+			var requestedApp = await _dbContext.Apps.AsNoTracking().Select(a => new { id = a.AppId, path = a.AppPicturePath })
+				.SingleOrDefaultAsync(a => a.id == appId);
+
 			if (requestedApp == null)
 				return NotFound();
 
 			// TO DO make a check for valid path
-			return PhysicalFile(requestedApp.AppPicturePath, "image/png");
+			return PhysicalFile(requestedApp.path, "image/png");
 		}
 	}
 }
