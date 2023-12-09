@@ -1,9 +1,11 @@
 ﻿using AppsMarketplaceWebApi.DTO;
 using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Xml.Linq;
 using tusdotnet.Stores;
 
 namespace AppsMarketplaceWebApi.Controllers
@@ -54,7 +56,37 @@ namespace AppsMarketplaceWebApi.Controllers
 			return Ok();
 		}
 
-		[Authorize]
+        [Authorize]
+        [HttpGet("DownloadAppById")]
+        public async Task<IActionResult> DownloadAppById(string appId)
+        {
+            App? app = await _dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(s => s.AppId == appId);
+
+            if (app == null)
+                return NotFound();
+
+            User? user = await _userManager.GetUserAsync(User);
+
+            if (user == null)
+                return BadRequest();
+
+            AppsOwnershipInfo ownershipInfo = new()
+            {
+                AppId = appId,
+                UserId = user.Id
+            };
+
+            bool owns = await _dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
+
+            if (!owns)
+                return BadRequest("You do not own the requested app");
+
+            HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{app.Name}.{app.Extension}\"" });
+
+            return PhysicalFile(app.Path, "application/octet-stream");
+        }
+
+        [Authorize]
 		[HttpGet("GetMyApps")]
 		public async Task<IActionResult> GetMyApps()
 		{
@@ -64,7 +96,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				return BadRequest();
 
 			var res = await _dbContext.AppsOwnershipInfos.AsNoTracking().Where(oi => oi.UserId == user.Id).Join
-			(	
+			(
 				_dbContext.Apps,
 				oi => oi.AppId, app => app.AppId,
 				(oi, app) => new AppDTO
@@ -73,7 +105,7 @@ namespace AppsMarketplaceWebApi.Controllers
 					UploadDate = app.UploadDate,
 					DeveloperId = app.DeveloperId,
 					Price = app.Price,
-					CategoryId = app.CategoryId,
+					CategoryName = app.CategoryName,
 					Description = app.Description,
 					SpecialDescription = app.SpecialDescription,
 					Name = app.Name,
@@ -82,6 +114,34 @@ namespace AppsMarketplaceWebApi.Controllers
 			).ToArrayAsync();
 
 			return Ok(res);
+		}
+
+		[Authorize]
+		[HttpGet("IsOwned")]
+		public async Task<IActionResult> IsOwned(string appId)
+		{
+			App? app = await _dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
+
+			if (app == null)
+				return NotFound();
+
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest();
+
+			AppsOwnershipInfo ownershipInfo = new()
+			{
+				AppId = appId,
+				UserId = user.Id
+			};
+
+			bool owns = await _dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
+
+			if (owns)
+				return Ok();
+			else
+				return Forbid("You don't own that app");
 		}
 
 
@@ -98,7 +158,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				toSend.UploadDate = app.UploadDate;
 				toSend.DeveloperId = app.DeveloperId;
 				toSend.Price = app.Price;
-				toSend.CategoryId = app.CategoryId;
+				toSend.CategoryName = app.CategoryName;
 				toSend.Description = app.Description;
 				toSend.SpecialDescription = app.SpecialDescription;
 				toSend.Name = app.Name;
@@ -122,7 +182,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				UploadDate = app.UploadDate,
 				DeveloperId = app.DeveloperId,
 				Price = app.Price,
-				CategoryId = app.CategoryId,
+				CategoryName = app.CategoryName,
 				Description = app.Description,
 				SpecialDescription = app.SpecialDescription,
 				Name = app.Name,

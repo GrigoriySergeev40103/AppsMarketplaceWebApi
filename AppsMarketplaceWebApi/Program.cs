@@ -215,11 +215,11 @@ app.MapTus("/files", async (httpContext) => new()
 				return;
 			}
 
-			metadataKey = "category_id";
+			metadataKey = "category_name";
 			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 			{
-				toAdd.CategoryId = int.Parse(valueData!.GetString(Encoding.UTF8));
+				toAdd.CategoryName = valueData!.GetString(Encoding.UTF8);
 			}
 			else
 			{

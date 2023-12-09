@@ -16,8 +16,13 @@ namespace AppsMarketplaceWebApi.Controllers
 
         [Authorize(Roles = "Admin")]
         [HttpPost("AddAppCategory")]
-        public async Task<HttpStatusCode> AddAppCategory(string categoryName)
+        public async Task<IActionResult> AddAppCategory(string categoryName)
         {
+            bool alreadyExists = await _dbContext.AppCategories.AsNoTracking().ContainsAsync(new AppCategory() { CategoryName = categoryName });
+
+            if (alreadyExists)
+                return BadRequest();
+
             AppCategory category = new()
             {
                 CategoryName = categoryName
@@ -25,14 +30,14 @@ namespace AppsMarketplaceWebApi.Controllers
 
             await _dbContext.AppCategories.AddAsync(category);
             await _dbContext.SaveChangesAsync();
-            return HttpStatusCode.OK;
+            return Ok();
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpDelete("RemoveAppCategoryById")]
-        public async Task<IActionResult> RemoveAppCategoryById(int categoryId)
+        [HttpDelete("RemoveAppCategoryByName")]
+        public async Task<IActionResult> RemoveAppCategoryByName(string categoryName)
         {
-            AppCategory? category = await _dbContext.AppCategories.SingleOrDefaultAsync(category => category.CategoryId == categoryId);
+            AppCategory? category = await _dbContext.AppCategories.SingleOrDefaultAsync(category => category.CategoryName == categoryName);
 
             if(category == null)
             {
