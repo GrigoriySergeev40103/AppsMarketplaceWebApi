@@ -65,6 +65,10 @@ namespace AppsMarketplaceWebApi.Controllers
             if (app == null)
                 return NotFound();
 
+			bool appDataExists = System.IO.File.Exists(app.Path);
+			if (!appDataExists)
+				return NotFound("Couldn't find app's files on the server");
+
             User? user = await _userManager.GetUserAsync(User);
 
             if (user == null)

@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic;
+using System.Buffers;
 using System.Text;
 using tusdotnet;
 using tusdotnet.Helpers;
@@ -85,6 +87,23 @@ app.Map("/promote", async (HttpContext httpContext, RoleManager<IdentityRole> ro
 	await userManager.AddToRoleAsync((await userManager.GetUserAsync(httpContext.User))!, "Admin");
 }).RequireAuthorization();
 
+
+
+string? pathToDefaultAppPic = builder.Configuration.GetSection("DefaultAppPicPath").Value;
+if (pathToDefaultAppPic == null)
+{
+	Console.WriteLine("Couldn't retrieve 'DefaultAppPicPath' value from configuration(indicates a full path to a default app picture)");
+    return;
+}
+
+string? pathToImagesDir = builder.Configuration.GetSection("ImageStore").Value;
+if (pathToImagesDir == null)
+{
+    Console.WriteLine("Couldn't retrieve 'ImageStore' value from configuration(indicates a full path to directory for app to where to store images)");
+    return;
+}
+
+ConfigurationValues configValues = new(pathToDefaultAppPic, pathToImagesDir);
 app.MapTus("/files", async (httpContext) => new()
 {
 	// This method is called on each request so different configurations can be returned per user, domain, path etc.
@@ -112,8 +131,12 @@ app.MapTus("/files", async (httpContext) => new()
 			{
 				ctx.FailRequest("price metadata must be specified. ");
 			}
+            if (!ctx.Metadata.ContainsKey("category_name"))
+            {
+                ctx.FailRequest("category name metadata must be specified. ");
+            }
 
-			return Task.CompletedTask;
+            return Task.CompletedTask;
 		},
 		OnFileCompleteAsync = async eventContext =>
 		{
@@ -215,11 +238,29 @@ app.MapTus("/files", async (httpContext) => new()
 				return;
 			}
 
-			metadataKey = "category_name";
+            AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();
+            if (dbContext == null)
+            {
+                Console.WriteLine("ERROR: failed to get database context to add file. Discarding file...");
+                await DiscardFile();
+                return;
+            }
+
+            metadataKey = "category_name";
 			hasData = metadata.TryGetValue(metadataKey, out valueData);
 			if (hasData)
 			{
-				toAdd.CategoryName = valueData!.GetString(Encoding.UTF8);
+				string categoryName = valueData!.GetString(Encoding.UTF8);
+                bool categoryExists = await dbContext.AppCategories.AsNoTracking().ContainsAsync(new AppCategory() { CategoryName = categoryName });
+
+				if (categoryExists)
+					toAdd.CategoryName = valueData!.GetString(Encoding.UTF8);
+				else
+				{
+                    httpContext.Response.StatusCode = 400;
+                    httpContext.Response.Headers.Append("Reason for failure", $"Category name '{categoryName}' does not exist");
+                    return;
+				}
 			}
 			else
 			{
@@ -229,33 +270,17 @@ app.MapTus("/files", async (httpContext) => new()
 			}
 
 			//---------------Set app pic---------------//
-			string? pathToDefaultAppPic = builder.Configuration.GetSection("DefaultAppPicPath").Value;
-			if (pathToDefaultAppPic == null)
-				return;
-
-			string? pathToImagesDir = builder.Configuration.GetSection("ImageStore").Value;
-			if (pathToImagesDir == null)
-				return;
-
-			string pathToAppPic = pathToImagesDir + $"/{toAdd.AppId}.png";
+			string pathToAppPic = configValues.PathToImagesDir + $"/{toAdd.AppId}.png";
 
 			// Copying default app pic instead of pointing to source because
 			// I think it's better than having to check that to be deleted App's pic is default pick or not
-			File.Copy(pathToDefaultAppPic, pathToAppPic);
+			File.Copy(configValues.PathToDefaultAppPic, pathToAppPic);
 
 			toAdd.AppPicturePath = pathToAppPic;
 			//---------------Set app pic---------------//
 
 			toAdd.UploadDate = DateTime.UtcNow;
 			toAdd.Path = $"C:\\dev\\AppMarket\\apps\\{file.Id}";
-
-			AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();
-			if (dbContext == null)
-			{
-				Console.WriteLine("ERROR: failed to get database context to add file. Discarding file...");
-				await DiscardFile();
-				return;
-			}
 
  			await dbContext.Apps.AddAsync(toAdd);
 			await dbContext.SaveChangesAsync();
