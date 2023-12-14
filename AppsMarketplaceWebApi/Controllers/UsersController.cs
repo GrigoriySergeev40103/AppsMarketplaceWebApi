@@ -46,7 +46,22 @@ namespace AppsMarketplaceWebApi.Controllers
             return Ok(toReturn);
         }
 
-        [Authorize]
+		[HttpGet("GetUsersByIds")]
+		public async Task<ActionResult<UserDTO[]>> GetUsersByIds([FromQuery] string[] userIds)
+		{
+			UserDTO[] requestedUsers = await _dbContext.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).
+                Select(u => new UserDTO { Id = u.Id, UserName = u.UserName}).ToArrayAsync();
+
+            if (requestedUsers == null)
+                return NotFound();
+
+            if (requestedUsers.Length == 0)
+                return NotFound();
+
+			return Ok(requestedUsers);
+		}
+
+		[Authorize]
 		[HttpGet("GetMyself")]
 		public async Task<ActionResult<PersonalUserDTO>> GetMyself()
 		{
