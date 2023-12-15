@@ -1,22 +1,8 @@
 ﻿using AppsMarketplaceWebApi.DTO;
-using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.Data;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
-using System.Text.Encodings.Web;
-using System.Text;
-using tusdotnet.Stores;
-using Microsoft.AspNetCore.Authentication.BearerToken;
-using Microsoft.Extensions.Options;
-using System.Security.Claims;
 
 namespace AppsMarketplaceWebApi.Controllers
 {
@@ -99,28 +85,21 @@ namespace AppsMarketplaceWebApi.Controllers
             return PhysicalFile(user.PathToAvatarPic, "image/png");
         }
 
-        //[Authorize]
-        //[HttpPut("UpdateUserAvatar")]
-        //public async Task<IActionResult> UpdateUserAvatar(string userId, [FromForm] IFormFile file)
-        //{
-        //    User? requestedUser = await _dbContext.Users.SingleOrDefaultAsync(u => u.Id == userId);
-        //    if (requestedUser == null)
-        //        return NotFound();
+        [Authorize]
+        [HttpPut("UpdateAvatar")]
+        public async Task<IActionResult> UpdateAvatar([FromForm] IFormFile file)
+        {
+            User? toUpdate = await _userManager.GetUserAsync(User);
 
-        //    User? user = await _userManager.GetUserAsync(User);
+            if (toUpdate == null)
+                return Problem("Failed to identify the user");
 
-        //    if (user == null)
-        //        return BadRequest();
+            string path = toUpdate.PathToAvatarPic;
 
-        //    if (user.Id != requestedUser.Id)
-        //        return Unauthorized();
+            using FileStream stream = new(path, FileMode.Create);
+            await file.CopyToAsync(stream);
 
-        //    string path = $"C:\\dev\\AppMarket\\images\\{userId}.jpg";
-
-        //    using FileStream stream = new(path, FileMode.Create);
-        //    await file.CopyToAsync(stream);
-
-        //    return Ok();
-        //}
+            return Ok();
+        }
     }
 }
