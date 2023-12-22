@@ -22,7 +22,7 @@ namespace AppsMarketplaceWebApi.Controllers
 {
 	[Route("api/[controller]")]
 	[ApiController]
-	public class AuthController(AppDbContext dbContext, UserManager<User> userManager, TimeProvider timeProvider,
+	public class AuthController(UserManager<User> userManager, TimeProvider timeProvider,
 		IOptionsMonitor<BearerTokenOptions> bearerTokenOptions, IEmailSender<User> emailSender, 
 		LinkGenerator linkGenerator, IConfiguration configuration) : ControllerBase
 	{
@@ -39,27 +39,33 @@ namespace AppsMarketplaceWebApi.Controllers
 		// We'll figure out a unique endpoint name based on the final route pattern during endpoint generation.
 		const string confirmEmailEndpointName = $"{nameof(AuthController)}-ConfirmEmail";
 
-		protected readonly AppDbContext _dbContext = dbContext;
 		protected readonly UserManager<User> _userManager = userManager;
 
 		#region AUTHENTICATION AND AUTHORIZATION
 		//--------------------------------------AUTHENTICATION AND AUTHORIZATION--------------------------------------//
 		[HttpPost("Register")]
-		public async Task<Results<Ok, ValidationProblem, ProblemHttpResult>> Register([FromBody] RegisterRequest registration,
+		public async Task<Results<Ok, ValidationProblem, ProblemHttpResult>> Register([FromBody] RegistrationDTO registration,
 			[FromServices] UserManager<User> userManager, [FromServices] IServiceProvider sp)
 		{
 			if (!userManager.SupportsUserEmail)
 			{
-				throw new NotSupportedException($"{nameof(UsersController)} requires a user store with email support.");
+				throw new NotSupportedException($"{nameof(AuthController)} requires a user store with email support.");
 			}
 
 			var userStore = sp.GetRequiredService<IUserStore<User>>();
 			var emailStore = (IUserEmailStore<User>)userStore;
-			var email = registration.Email;
+			string email = registration.Email;
 
 			if (string.IsNullOrEmpty(email) || !_emailAddressAttribute.IsValid(email))
 			{
 				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(email)));
+			}
+
+			string username = registration.Username.Trim();
+
+			if (string.IsNullOrEmpty(username) || username.Length == 0 || username.Length > 25)
+			{
+				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidUserName(username)));
 			}
 
 			User user = new();
@@ -79,14 +85,15 @@ namespace AppsMarketplaceWebApi.Controllers
 				// Perhaps should make sure to check if it will get created by User manager first?
 				System.IO.File.Copy(pathToDefaultAvatarPic, pathToAvatar);
 			}
-			catch (Exception)
+			catch (Exception e)
 			{
+				Console.WriteLine(e.Message);
 				return TypedResults.Problem(statusCode: 500);
 			}
 
 			user.PathToAvatarPic = pathToAvatar;
 
-			await userStore.SetUserNameAsync(user, email, CancellationToken.None);
+			await userStore.SetUserNameAsync(user, username, CancellationToken.None);
 			await emailStore.SetEmailAsync(user, email, CancellationToken.None);
 			var result = await userManager.CreateAsync(user, registration.Password);
 
@@ -100,14 +107,14 @@ namespace AppsMarketplaceWebApi.Controllers
 		}
 
 		[HttpPost("Login")]
-		public async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>> Login([FromBody] LoginRequest login,
+		public async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>> Login([FromBody] LoginDTO login,
 			[FromQuery] bool? useCookies, [FromQuery] bool? useSessionCookies, [FromServices] SignInManager<User> signInManager)
 		{
 			var useCookieScheme = (useCookies == true) || (useSessionCookies == true);
 			var isPersistent = (useCookies == true) && (useSessionCookies != true);
 			signInManager.AuthenticationScheme = useCookieScheme ? IdentityConstants.ApplicationScheme : IdentityConstants.BearerScheme;
 
-			var result = await signInManager.PasswordSignInAsync(login.Email, login.Password, isPersistent, lockoutOnFailure: true);
+			var result = await signInManager.PasswordSignInAsync(login.Username, login.Password, isPersistent, lockoutOnFailure: true);
 
 			if (result.RequiresTwoFactor)
 			{

@@ -8,15 +8,14 @@ namespace AppsMarketplaceWebApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UsersController(AppDbContext dbContext, UserManager<User> userManager) : ControllerBase
+    public class UsersController(UserManager<User> userManager) : ControllerBase
     {
-        protected readonly AppDbContext _dbContext = dbContext;
         protected readonly UserManager<User> _userManager = userManager;
 
 		[HttpGet("GetUserById")]
-        public async Task<ActionResult<UserDTO>> GetUserById(string userId)
+        public async Task<ActionResult<UserDTO>> GetUserById(string userId, [FromServices] AppDbContext dbContext)
         {
-            User? user = await _dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
+            User? user = await dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
             {
@@ -33,9 +32,9 @@ namespace AppsMarketplaceWebApi.Controllers
         }
 
 		[HttpGet("GetUsersByIds")]
-		public async Task<ActionResult<UserDTO[]>> GetUsersByIds([FromQuery] string[] userIds)
+		public async Task<ActionResult<UserDTO[]>> GetUsersByIds([FromQuery] string[] userIds, [FromServices] AppDbContext dbContext)
 		{
-			UserDTO[] requestedUsers = await _dbContext.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).
+			UserDTO[] requestedUsers = await dbContext.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).
                 Select(u => new UserDTO { Id = u.Id, UserName = u.UserName}).ToArrayAsync();
 
             if (requestedUsers == null)
@@ -69,9 +68,9 @@ namespace AppsMarketplaceWebApi.Controllers
 		}
 
 		[HttpGet("GetUserAvatar")]
-        public async Task<IActionResult> GetUserAvatar(string userId)
+        public async Task<IActionResult> GetUserAvatar(string userId, [FromServices] AppDbContext dbContext)
         {
-            User? user = await _dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
+            User? user = await dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)
             {

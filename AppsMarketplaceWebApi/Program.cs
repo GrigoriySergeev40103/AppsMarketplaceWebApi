@@ -52,7 +52,11 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
 	.AddIdentityCookies();
 builder.Services.AddAuthorizationBuilder();
 
-builder.Services.AddIdentityCore<User>()
+builder.Services.AddIdentityCore<User>(options =>
+{
+	options.User.AllowedUserNameCharacters =
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
+})
 	.AddRoles<IdentityRole>()
 	.AddEntityFrameworkStores<AppDbContext>()
 	.AddApiEndpoints();
