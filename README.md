@@ -1,6 +1,6 @@
 # AppsMarketplaceWebApi
 
-A Web Api of an apps marketplace platform built with C# and ASP.NET.
+A Web Api of an apps marketplace platform built with C#, ASP.NET and Tus protocol(for apps uploading).
 Basically an apps marketplace server in a form of a web api.
 
 # Requirements
