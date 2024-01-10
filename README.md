@@ -37,8 +37,8 @@ For the app to work you need to change some stuff in appsettings.json:
 
 # Using other databases
 
-If you want to use some other database instead of mysql it should be of no problem, all you would have to do is delete MySql Entity framework provider(Not sure if that's the proper name) Pomelo.EntityFrameworkCore.MySql and install the ef(entity framework) provider you want(You should be able to do all that from NuGet Package Manager), update the database connection string in the appsettings.json(like mentioned in the setup paragraph).
-After that you would need to chnage the Program.cs a bit:
+If you want to use some other database instead of **MySql** it should be of no problem, all you would have to do is delete MySql Entity framework provider(Not sure if that's the proper name) **Pomelo.EntityFrameworkCore.MySql** and install the EF(entity framework) provider you want(You should be able to do all that from NuGet Package Manager), update the database connection string in the **appsettings.json**(like mentioned in the setup paragraph).
+After that you would need to chnage the **Program.cs** a bit:
 ```
 builder.Services.AddDbContext<AppDbContext>(
 	options => options.UseMySql(connectionStr, ServerVersion.AutoDetect(connectionStr))
