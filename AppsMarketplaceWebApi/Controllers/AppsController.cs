@@ -26,8 +26,9 @@ namespace AppsMarketplaceWebApi.Controllers
                 return NotFound();
 
             User? user = await _userManager.GetUserAsync(User);
+            User? developer = await dbContext.Users.SingleOrDefaultAsync(u => u.Id == app.DeveloperId);
 
-            if (user == null)
+            if (user == null || developer == null)
                 return BadRequest();
 
             AppsOwnershipInfo ownershipInfo = new()
@@ -44,7 +45,10 @@ namespace AppsMarketplaceWebApi.Controllers
             if (user.Balance < app.Price)
                 return BadRequest("Not enough money");
 
+            // Not really sure if I even should be using decimal for money operations(floating point arith innaccurate nature?) but it is what it is right now
+            // should make sure to not overflow too
             user.Balance -= app.Price;
+            developer.Balance += app.Price;
 
             await dbContext.AppsOwnershipInfos.AddAsync(ownershipInfo);
             await dbContext.SaveChangesAsync();
@@ -53,26 +57,22 @@ namespace AppsMarketplaceWebApi.Controllers
         }
 
         [Authorize]
-        [HttpGet("DownloadAppById")]
-        public async Task<IActionResult> DownloadAppById(string appId, [FromServices] AppDbContext dbContext)
+        [HttpGet("DownloadAppFileById")]
+        public async Task<IActionResult> DownloadAppFileById(string appFileId, [FromServices] AppDbContext dbContext)
         {
-            App? app = await dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(s => s.AppId == appId);
+            AppFile? appFile = await dbContext.AppFiles.AsNoTracking().SingleOrDefaultAsync(af => af.AppId == appFileId);
 
-            if (app == null)
-                return NotFound();
+            if (appFile == null)
+                return NotFound("Couldn't find a file with specified id");
 
-            bool appDataExists = System.IO.File.Exists(app.Path);
-            if (!appDataExists)
-                return NotFound("Couldn't find app's files on the server");
-
-            User? user = await _userManager.GetUserAsync(User);
+			User? user = await _userManager.GetUserAsync(User);
 
             if (user == null)
-                return BadRequest();
+                return Forbid();
 
             AppsOwnershipInfo ownershipInfo = new()
             {
-                AppId = appId,
+                AppId = appFile.AppId,
                 UserId = user.Id
             };
 
@@ -81,9 +81,13 @@ namespace AppsMarketplaceWebApi.Controllers
             if (!owns)
                 return BadRequest("You do not own the requested app");
 
-            HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{app.Name}.{app.Extension}\"" });
+			bool appDataExists = System.IO.File.Exists(appFile.Path);
+			if (!appDataExists)
+				return NotFound("Couldn't find requested file on the server");
 
-            return PhysicalFile(app.Path, "application/octet-stream");
+			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{appFile.Filename}.{appFile.Extension}\"" });
+
+            return PhysicalFile(appFile.Path, "application/octet-stream");
         }
 
         [Authorize]
@@ -257,7 +261,7 @@ namespace AppsMarketplaceWebApi.Controllers
 
             string path = imagesPath + $"\\{appId}.png";
 
-            // Will overwrite previous App's picture
+            // Will overwrite previous App's picture if there's one
             using FileStream fstream = new(path, FileMode.Create);
             await file.CopyToAsync(fstream);
 
@@ -281,7 +285,6 @@ namespace AppsMarketplaceWebApi.Controllers
             if (!picExists)
                 return NotFound("Couldn't find app's image on the server.");
 
-            // TO DO make a check for valid path
             return PhysicalFile(requestedApp.path, "image/png");
         }
     }

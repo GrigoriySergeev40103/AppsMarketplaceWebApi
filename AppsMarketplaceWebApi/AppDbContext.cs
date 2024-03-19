@@ -7,6 +7,7 @@ namespace AppsMarketplaceWebApi
 	public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<User>(options)
 	{
 		public DbSet<App> Apps { get; set; }
+		public DbSet<AppFile> AppFiles { get; set; }
 		public DbSet<AppsOwnershipInfo> AppsOwnershipInfos { get; set; }
 		public DbSet<AppCategory> AppCategories { get; set; }
 

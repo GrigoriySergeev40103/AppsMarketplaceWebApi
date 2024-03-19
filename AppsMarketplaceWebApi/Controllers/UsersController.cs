@@ -34,6 +34,9 @@ namespace AppsMarketplaceWebApi.Controllers
 		[HttpGet("GetUsersByIds")]
 		public async Task<ActionResult<UserDTO[]>> GetUsersByIds([FromQuery] string[] userIds, [FromServices] AppDbContext dbContext)
 		{
+            if (userIds.Length == 0)
+                return NotFound("You must specify a list of users id to look for.");
+
 			UserDTO[] requestedUsers = await dbContext.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).
                 Select(u => new UserDTO { Id = u.Id, UserName = u.UserName}).ToArrayAsync();
 
