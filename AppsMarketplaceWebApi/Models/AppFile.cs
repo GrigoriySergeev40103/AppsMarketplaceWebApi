@@ -15,6 +15,6 @@ namespace AppsMarketplaceWebApi.Models
 
 		public string Path { get; set; } = null!;
 
-		public string Extension { get; set; } = null!;
+		public DateTime UploadDate { get; set; }
 	}
 }

@@ -1,4 +1,4 @@
-﻿using AppsMarketplaceWebApi.DTO;
+﻿using AppsMarketplaceDTO;
 using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;

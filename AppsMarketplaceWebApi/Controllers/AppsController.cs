@@ -1,4 +1,4 @@
-﻿using AppsMarketplaceWebApi.DTO;
+﻿using AppsMarketplaceDTO;
 using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -60,7 +60,7 @@ namespace AppsMarketplaceWebApi.Controllers
         [HttpGet("DownloadAppFileById")]
         public async Task<IActionResult> DownloadAppFileById(string appFileId, [FromServices] AppDbContext dbContext)
         {
-            AppFile? appFile = await dbContext.AppFiles.AsNoTracking().SingleOrDefaultAsync(af => af.AppId == appFileId);
+            AppFile? appFile = await dbContext.AppFiles.AsNoTracking().SingleOrDefaultAsync(af => af.AppFileId == appFileId);
 
             if (appFile == null)
                 return NotFound("Couldn't find a file with specified id");
@@ -85,7 +85,7 @@ namespace AppsMarketplaceWebApi.Controllers
 			if (!appDataExists)
 				return NotFound("Couldn't find requested file on the server");
 
-			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{appFile.Filename}.{appFile.Extension}\"" });
+			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{appFile.Filename}\"" });
 
             return PhysicalFile(appFile.Path, "application/octet-stream");
         }
@@ -112,8 +112,7 @@ namespace AppsMarketplaceWebApi.Controllers
                     CategoryName = app.CategoryName,
                     Description = app.Description,
                     SpecialDescription = app.SpecialDescription,
-                    Name = app.Name,
-                    Extension = app.Extension
+                    Name = app.Name
                 }
             ).ToArrayAsync();
 
@@ -132,8 +131,7 @@ namespace AppsMarketplaceWebApi.Controllers
 				CategoryName = a.CategoryName,
 				Description = a.Description,
 				SpecialDescription = a.SpecialDescription,
-				Name = a.Name,
-				Extension = a.Extension
+				Name = a.Name
 			}).OrderByDescending(a => a.UploadDate).Skip(startIndex).Take(count).AsAsyncEnumerable();
 
 			await foreach (AppDTO app in apps)
@@ -183,8 +181,7 @@ namespace AppsMarketplaceWebApi.Controllers
                 CategoryName = a.CategoryName,
                 Description = a.Description,
                 SpecialDescription = a.SpecialDescription,
-                Name = a.Name,
-                Extension = a.Extension
+                Name = a.Name
             }).AsAsyncEnumerable();
 
             await foreach (AppDTO app in apps)
@@ -210,14 +207,45 @@ namespace AppsMarketplaceWebApi.Controllers
                 CategoryName = app.CategoryName,
                 Description = app.Description,
                 SpecialDescription = app.SpecialDescription,
-                Name = app.Name,
-                Extension = app.Extension
+                Name = app.Name
             };
 
             return Ok(toReturn);
         }
 
-        [Authorize(Roles = "Admin")]
+		[HttpGet("GetFullAppById")]
+		public async Task<IActionResult> GetFullAppById(string appId, [FromServices] AppDbContext dbContext)
+		{
+			App? app = await dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
+
+			if (app == null)
+				return NotFound("Couldn't find app with specified id.");
+
+            AppFileDTO[] files = await dbContext.AppFiles.AsNoTracking().Where(af => af.AppId == app.AppId).Select(af => new AppFileDTO()
+            {
+                AppFileId = af.AppFileId,
+                AppId = af.AppId,
+                Filename = af.Filename,
+                UploadDate = af.UploadDate
+            }).ToArrayAsync();
+
+			FullAppDTO toReturn = new()
+			{
+				AppId = app.AppId,
+				UploadDate = app.UploadDate,
+				DeveloperId = app.DeveloperId,
+				Price = app.Price,
+				CategoryName = app.CategoryName,
+				Description = app.Description,
+				SpecialDescription = app.SpecialDescription,
+				Name = app.Name,
+                Files = files
+			};
+
+			return Ok(toReturn);
+		}
+
+		[Authorize(Roles = "Admin")]
         [HttpDelete("DeleteAppById")]
         public async Task<IActionResult> DeleteAppById(string appId, [FromServices] AppDbContext dbContext)
         {

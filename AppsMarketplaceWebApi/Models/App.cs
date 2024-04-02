@@ -13,8 +13,6 @@ namespace AppsMarketplaceWebApi.Models
 
 		public string AppPicturePath { get;set; } = null!;
 
-		public string Extension { get; set; } = null!;
-
 		public DateTime UploadDate { get; set; }
 
 		public decimal Price { get; set; }
