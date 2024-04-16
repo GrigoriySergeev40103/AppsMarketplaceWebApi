@@ -10,6 +10,7 @@ namespace AppsMarketplaceWebApi
 		public DbSet<AppFile> AppFiles { get; set; }
 		public DbSet<AppsOwnershipInfo> AppsOwnershipInfos { get; set; }
 		public DbSet<AppCategory> AppCategories { get; set; }
+		public DbSet<Comment> Comments { get; set; }
 
 		protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		{

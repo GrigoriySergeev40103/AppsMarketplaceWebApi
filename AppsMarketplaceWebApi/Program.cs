@@ -17,6 +17,7 @@ using tusdotnet.Helpers;
 using tusdotnet.Interfaces;
 using tusdotnet.Models;
 using tusdotnet.Stores;
+using Microsoft.AspNetCore.Identity.UI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,6 +86,9 @@ builder.Services.Configure<FormOptions>(x =>
 	x.MultipartHeadersLengthLimit = int.MaxValue;
 });
 // ------------------------------Configure so it accepts big tus files------------------------------//
+
+builder.Services.AddTransient<IEmailSender, EmailSender>();
+builder.Services.AddTransient<IEmailSender<User>, MessageEmailSender<User>>();
 
 var app = builder.Build();
 

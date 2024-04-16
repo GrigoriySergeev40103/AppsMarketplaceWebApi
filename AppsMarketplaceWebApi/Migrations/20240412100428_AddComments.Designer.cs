@@ -3,6 +3,7 @@ using System;
 using AppsMarketplaceWebApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AppsMarketplaceWebApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240412100428_AddComments")]
+    partial class AddComments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -121,9 +124,6 @@ namespace AppsMarketplaceWebApi.Migrations
                     b.Property<string>("CommenteeId")
                         .IsRequired()
                         .HasColumnType("longtext");
-
-                    b.Property<DateTime>("UploadDate")
-                        .HasColumnType("datetime(6)");
 
                     b.HasKey("CommentId");
 

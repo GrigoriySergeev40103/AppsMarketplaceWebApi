@@ -1,4 +1,5 @@
-﻿using AppsMarketplaceDTO;
+﻿using AppMarketplaceDTOs;
+using AppsMarketplaceDTO;
 using AppsMarketplaceWebApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -85,7 +86,8 @@ namespace AppsMarketplaceWebApi.Controllers
 			if (!appDataExists)
 				return NotFound("Couldn't find requested file on the server");
 
-			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{appFile.Filename}\"" });
+			// System.Net.WebUtility.UrlEncode so we can return non ascii characters(headers don't allow non-ascii)
+			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{System.Net.WebUtility.UrlEncode(appFile.Filename)}\"" });
 
             return PhysicalFile(appFile.Path, "application/octet-stream");
         }
@@ -167,7 +169,6 @@ namespace AppsMarketplaceWebApi.Controllers
             else
                 return Unauthorized("You don't own that app");
         }
-
 
         [HttpGet("GetAllApps")]
         public async IAsyncEnumerable<AppDTO> GetAllApps([FromServices] AppDbContext dbContext)
@@ -266,7 +267,6 @@ namespace AppsMarketplaceWebApi.Controllers
             return Ok();
         }
 
-
         [Authorize]
         [HttpPost("UpdateAppImage")]
         public async Task<IActionResult> UpdateAppImage(string appId, [FromForm] IFormFile file, [FromServices] AppDbContext dbContext)
@@ -315,5 +315,68 @@ namespace AppsMarketplaceWebApi.Controllers
 
             return PhysicalFile(requestedApp.path, "image/png");
         }
-    }
+
+        [Authorize]
+        [HttpPost("PostComment")]
+        public async Task<IActionResult> PostComment([FromQuery] string appId, [FromBody] string commentContent, [FromServices] AppDbContext dbContext)
+        {
+            if (string.IsNullOrWhiteSpace(commentContent))
+                return BadRequest("The comment can not be an null/empty/only whitespace");
+
+            App? commentedApp = await dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
+            if (commentedApp == null)
+                return NotFound("Could not find an app that you want to leave a comment on.");
+
+            User? commentee = await _userManager.GetUserAsync(User);
+            if (commentee == null)
+                return BadRequest();
+
+            Comment newComment = new();
+            newComment.CommentId = Guid.NewGuid().ToString();
+            newComment.AppId = appId;
+            newComment.CommentContent = commentContent;
+            newComment.CommenteeId = commentee.Id;
+            newComment.UploadDate = DateTime.UtcNow;
+
+            await dbContext.Comments.AddAsync(newComment);
+            await dbContext.SaveChangesAsync();
+
+            return Ok();
+        }
+
+        [HttpGet("GetAppComments")]
+        public async IAsyncEnumerable<Comment> GetAppComments(string appId, [FromServices] AppDbContext dbContext)
+        {
+            var comments = dbContext.Comments.AsNoTracking().Where(c => c.AppId == appId).OrderByDescending(c => c.UploadDate).AsAsyncEnumerable();
+
+            await foreach(Comment comment in comments)
+            {
+                yield return comment;
+            }
+		}
+
+		[HttpGet("GetExtAppComments")]
+		public async IAsyncEnumerable<ExtCommentDTO> GetExtAppComments(string appId, [FromServices] AppDbContext dbContext)
+		{
+			var comments = dbContext.Comments.AsNoTracking().Where(c => c.AppId == appId).OrderByDescending(c => c.UploadDate).Join
+                (
+                    dbContext.Users,
+                    c => c.CommenteeId, u => u.Id,
+                    (c, u) => new ExtCommentDTO
+                    {
+                        CommentId = c.CommentId,
+                        CommentContent = c.CommentContent,
+                        CommenteeId = c.CommenteeId,
+                        CommenteeName = u.DisplayName,
+                        UploadDate = c.UploadDate,
+                        AppId = appId
+                    }
+                ).AsAsyncEnumerable();
+
+			await foreach (ExtCommentDTO comment in comments)
+			{
+				yield return comment;
+			}
+		}
+	}
 }

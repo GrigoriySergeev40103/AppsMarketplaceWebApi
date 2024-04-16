@@ -17,6 +17,7 @@ using tusdotnet.Stores;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace AppsMarketplaceWebApi.Controllers
 {
@@ -44,45 +45,70 @@ namespace AppsMarketplaceWebApi.Controllers
 		#region AUTHENTICATION AND AUTHORIZATION
 		//--------------------------------------AUTHENTICATION AND AUTHORIZATION--------------------------------------//
 		[HttpPost("Register")]
-		public async Task<Results<Ok, ValidationProblem, ProblemHttpResult>> Register([FromBody] RegistrationDTO registration,
-			[FromServices] UserManager<User> userManager, [FromServices] IServiceProvider sp)
+		public async Task<Results<Ok, ValidationProblem, ProblemHttpResult, BadRequest<string>>> Register([FromBody] RegistrationDTO registration,
+			[FromServices] UserManager<User> userManager, [FromServices] AppDbContext dbContext, [FromServices] IServiceProvider sp)
 		{
 			if (!userManager.SupportsUserEmail)
 			{
 				throw new NotSupportedException($"{nameof(AuthController)} requires a user store with email support.");
 			}
 
-			var userStore = sp.GetRequiredService<IUserStore<User>>();
-			var emailStore = (IUserEmailStore<User>)userStore;
-			string email = registration.Email;
-
-			if (string.IsNullOrEmpty(email) || !_emailAddressAttribute.IsValid(email))
+			string trimmedDispName = registration.DisplayName.Trim();
+			if (trimmedDispName.Length == 0 || trimmedDispName.Length > 25)
 			{
-				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(email)));
+				return CreateValidationProblem("InvalidDispName", "Invalid display name! The display name must be non zero, <= 25 character length string after trimming");
 			}
 
-			string username = registration.Username.Trim();
+			var userStore = sp.GetRequiredService<IUserStore<User>>();
 
-			if (string.IsNullOrEmpty(username) || username.Length == 0 || username.Length > 25)
+			string trimmedUsername = registration.Username.Trim();
+
+			if (string.IsNullOrEmpty(trimmedUsername) || trimmedUsername.Length == 0 || trimmedUsername.Length > 25)
 			{
-				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidUserName(username)));
+				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidUserName(trimmedUsername)));
+			}
+
+			User? possibleConflict = await userManager.FindByNameAsync(trimmedUsername);
+			if (possibleConflict != null)
+			{
+				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.DuplicateUserName(trimmedUsername)));
 			}
 
 			User user = new();
+			user.DisplayName = registration.DisplayName;
+
+			string email = null!;
+			if (registration.Email != null)
+			{
+				email = registration.Email;
+				int conflicts = await dbContext.Users.AsNoTracking().Where(u => u.Email == email && u.EmailConfirmed).CountAsync();
+				if (conflicts != 0)
+				{
+					return TypedResults.BadRequest("The email is already taken.");
+				}
+
+				var emailStore = (IUserEmailStore<User>)userStore;
+
+				if (string.IsNullOrEmpty(email) || !_emailAddressAttribute.IsValid(email))
+				{
+					return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(email)));
+				}
+
+				await emailStore.SetEmailAsync(user, email, CancellationToken.None);
+			}
 
 			string? pathToDefaultAvatarPic = _configuration.GetSection("DefaultUserAvatarPath").Value;
 			if (pathToDefaultAvatarPic == null)
-				return TypedResults.Problem(statusCode: 500);
+				throw new Exception("Couldn't fine the default user avatar path in the configuration file, make sure you have 'DefaultUserAvatarPath' field set");
 
 			string? pathToImagesDir = _configuration.GetSection("ImageStore").Value;
 			if (pathToImagesDir == null)
-				return TypedResults.Problem(statusCode: 500);
+				throw new Exception("Couldn't fine the path to user avatar directory in the configuration file, make sure you have 'ImageStore' field set");
 
 			string pathToAvatar = pathToImagesDir + $"/{user.Id}.png";
 
 			try
 			{
-				// Perhaps should make sure to check if it will get created by User manager first?
 				System.IO.File.Copy(pathToDefaultAvatarPic, pathToAvatar);
 			}
 			catch (Exception e)
@@ -93,8 +119,7 @@ namespace AppsMarketplaceWebApi.Controllers
 
 			user.PathToAvatarPic = pathToAvatar;
 
-			await userStore.SetUserNameAsync(user, username, CancellationToken.None);
-			await emailStore.SetEmailAsync(user, email, CancellationToken.None);
+			await userStore.SetUserNameAsync(user, trimmedUsername, CancellationToken.None);
 			var result = await userManager.CreateAsync(user, registration.Password);
 
 			if (!result.Succeeded)
@@ -102,13 +127,17 @@ namespace AppsMarketplaceWebApi.Controllers
 				return CreateValidationProblem(result);
 			}
 
-			await SendConfirmationEmailAsync(user, userManager, HttpContext, email);
+			if(registration.Email != null)
+			{
+				await SendConfirmationEmailAsync(user, userManager, HttpContext, email);
+			}
+
 			return TypedResults.Ok();
 		}
 
 		[HttpPost("Login")]
-		public async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>> Login([FromBody] LoginDTO login,
-			[FromQuery] bool? useCookies, [FromQuery] bool? useSessionCookies, [FromServices] SignInManager<User> signInManager)
+		public async Task<Results<Ok<AccessTokenResponse>, EmptyHttpResult, ProblemHttpResult>> 
+			Login([FromBody] LoginDTO login, [FromQuery] bool? useCookies, [FromQuery] bool? useSessionCookies, [FromServices] SignInManager<User> signInManager)
 		{
 			var useCookieScheme = (useCookies == true) || (useSessionCookies == true);
 			var isPersistent = (useCookies == true) && (useSessionCookies != true);
@@ -157,10 +186,41 @@ namespace AppsMarketplaceWebApi.Controllers
 			return TypedResults.SignIn(newPrincipal, authenticationScheme: IdentityConstants.BearerScheme);
 		}
 
+		[Authorize]
+		[HttpPatch("ChangeEmail")]
+		public async Task<Results<Ok, ValidationProblem, UnauthorizedHttpResult, BadRequest<string>>> ChangeEmail([FromQuery] string newEmail, 
+			[FromServices] UserManager<User> userManager, [FromServices] AppDbContext dbContext, [FromServices] IServiceProvider sp)
+		{
+			User? user = await _userManager.GetUserAsync(User);
+			if (user == null)
+				return TypedResults.Unauthorized();
+
+			int conflicts = await dbContext.Users.AsNoTracking().Where(u => u.Email == newEmail && u.EmailConfirmed).CountAsync();
+			if(conflicts != 0)
+			{
+				return TypedResults.BadRequest("The email is already taken.");
+			}
+
+			if (string.IsNullOrEmpty(newEmail) || !_emailAddressAttribute.IsValid(newEmail))
+			{
+				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(newEmail)));
+			}
+
+			var userStore = sp.GetRequiredService<IUserStore<User>>();
+			var emailStore = (IUserEmailStore<User>)userStore;
+
+			await emailStore.SetEmailAsync(user, newEmail, CancellationToken.None);
+
+			await SendConfirmationEmailAsync(user, userManager, HttpContext, newEmail, true);
+
+			return TypedResults.Ok();
+		}
+
 		[EndpointName(confirmEmailEndpointName)]
 		[HttpGet("ConfirmEmail")]
-		public async Task<Results<ContentHttpResult, UnauthorizedHttpResult>> ConfirmEmail([FromQuery] string userId, [FromQuery] string code,
-			[FromQuery] string? changedEmail, [FromServices] UserManager<User> userManager)
+		public async Task<Results<ContentHttpResult, UnauthorizedHttpResult, BadRequest<string>, ValidationProblem>> 
+			ConfirmEmail([FromQuery] string userId, [FromQuery] string code, [FromQuery] string? changedEmail, 
+			[FromServices] UserManager<User> userManager, [FromServices] AppDbContext dbContext)
 		{
 			if (await userManager.FindByIdAsync(userId) is not { } user)
 			{
@@ -179,20 +239,38 @@ namespace AppsMarketplaceWebApi.Controllers
 
 			IdentityResult result;
 
+			string? email;
+
+			if (changedEmail != null)
+				email = changedEmail;
+			else
+				email = user.Email;
+
+			if(email != null)
+			{
+				int conflicts = await dbContext.Users.AsNoTracking().Where(u => u.Email == email && u.EmailConfirmed).CountAsync();
+				if (conflicts != 0)
+				{
+					return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.DuplicateEmail(email)));
+				}
+			}
+			else
+			{
+				return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(email)));
+			}
+
 			if (string.IsNullOrEmpty(changedEmail))
 			{
 				result = await userManager.ConfirmEmailAsync(user, code);
 			}
 			else
 			{
-				// As with Identity UI, email and user name are one and the same. So when we update the email,
-				// we need to update the user name.
-				result = await userManager.ChangeEmailAsync(user, changedEmail, code);
-
-				if (result.Succeeded)
+				if (!_emailAddressAttribute.IsValid(changedEmail))
 				{
-					result = await userManager.SetUserNameAsync(user, changedEmail);
+					return CreateValidationProblem(IdentityResult.Failed(userManager.ErrorDescriber.InvalidEmail(changedEmail)));
 				}
+
+				result = await userManager.ChangeEmailAsync(user, changedEmail, code);
 			}
 
 			if (!result.Succeeded)
@@ -218,16 +296,16 @@ namespace AppsMarketplaceWebApi.Controllers
 
 		[HttpPost("ForgotPassword")]
 		public async Task<Results<Ok, ValidationProblem>> ForgotPassword([FromBody] ForgotPasswordRequest resetRequest,
-			[FromServices] UserManager<User> userManager)
+			[FromServices] UserManager<User> userManager, [FromServices] AppDbContext dbContext)
 		{
-			var user = await userManager.FindByEmailAsync(resetRequest.Email);
+			User? user = await dbContext.Users.Where(u => u.Email == resetRequest.Email && u.EmailConfirmed).FirstOrDefaultAsync();
 
-			if (user is not null && await userManager.IsEmailConfirmedAsync(user))
+			if (user != null)
 			{
 				var code = await userManager.GeneratePasswordResetTokenAsync(user);
 				code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
-				await _emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email, HtmlEncoder.Default.Encode(code));
+				await _emailSender.SendPasswordResetCodeAsync(user, resetRequest.Email, code);
 			}
 
 			// Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have
@@ -237,11 +315,11 @@ namespace AppsMarketplaceWebApi.Controllers
 
 		[HttpPost("ResetPassword")]
 		public async Task<Results<Ok, ValidationProblem>> ResetPassword([FromBody] ResetPasswordRequest resetRequest,
-			[FromServices] UserManager<User> userManager)
+			[FromServices] UserManager<User> userManager, [FromServices] AppDbContext dbContext)
 		{
-			var user = await userManager.FindByEmailAsync(resetRequest.Email);
+			User? user = await dbContext.Users.Where(u => u.Email == resetRequest.Email && u.EmailConfirmed).FirstOrDefaultAsync();
 
-			if (user is null || !(await userManager.IsEmailConfirmedAsync(user)))
+			if (user == null)
 			{
 				// Don't reveal that the user does not exist or is not confirmed, so don't return a 200 if we would have
 				// returned a 400 for an invalid code given a valid user email.
@@ -422,7 +500,8 @@ namespace AppsMarketplaceWebApi.Controllers
 			var confirmEmailUrl = _linkGenerator.GetUriByName(context, confirmEmailEndpointName, routeValues)
 				?? throw new NotSupportedException($"Could not find endpoint named '{confirmEmailEndpointName}'.");
 
-			await _emailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(confirmEmailUrl));
+			//await _emailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(confirmEmailUrl));
+			await _emailSender.SendConfirmationLinkAsync(user, email, confirmEmailUrl);
 		}
 
 		private static ValidationProblem CreateValidationProblem(string errorCode, string errorDescription)

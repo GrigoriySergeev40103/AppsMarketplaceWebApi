@@ -25,7 +25,7 @@ namespace AppsMarketplaceWebApi.Controllers
             UserDTO toReturn = new()
             {
                 Id = user.Id,
-                UserName = user.UserName
+                DisplayName = user.DisplayName
             };
 
             return Ok(toReturn);
@@ -38,7 +38,7 @@ namespace AppsMarketplaceWebApi.Controllers
                 return NotFound("You must specify a list of users id to look for.");
 
 			UserDTO[] requestedUsers = await dbContext.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).
-                Select(u => new UserDTO { Id = u.Id, UserName = u.UserName}).ToArrayAsync();
+                Select(u => new UserDTO { Id = u.Id, DisplayName = u.DisplayName}).ToArrayAsync();
 
             if (requestedUsers == null)
                 return NotFound();
@@ -102,6 +102,24 @@ namespace AppsMarketplaceWebApi.Controllers
             await file.CopyToAsync(stream);
 
             return Ok();
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("DeleteUserById")]
+        public async Task<IActionResult> DeleteUserById([FromQuery] string userId, [FromServices] AppDbContext dbContext)
+        {
+            User? toDelete = await dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (toDelete == null)
+                return NotFound("Couldn't find a user with the specified id.");
+
+            // even if throws gonna be caught down the line and logged in console(by middleware i assume?)
+			System.IO.File.Delete(toDelete.PathToAvatarPic);
+
+            dbContext.Users.Remove(toDelete);
+
+            await dbContext.SaveChangesAsync();
+
+			return Ok();
         }
     }
 }

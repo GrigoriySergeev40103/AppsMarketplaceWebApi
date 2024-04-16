@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Options;
 using System.Net.Mail;
 using System.Net;
+using Microsoft.AspNetCore.Identity;
 
 namespace AppsMarketplaceWebApi
 {
@@ -69,6 +70,27 @@ namespace AppsMarketplaceWebApi
 			{
 				await smtpClient.SendMailAsync(mailMsg);
 			}
+		}
+	}
+
+	public class MessageEmailSender<TUser>(IEmailSender emailSender) : IEmailSender<TUser> where TUser : class
+	{
+		internal bool IsNoOp => emailSender is NoOpEmailSender;
+
+		public Task SendConfirmationLinkAsync(TUser user, string email, string confirmationLink)
+		{
+			return emailSender.SendEmailAsync(email, "Confirm your email", 
+				$"Please confirm your account by following the link, if you didn't request the link please ignore it and DO NOT follow it: {confirmationLink}");
+		}
+
+		public Task SendPasswordResetCodeAsync(TUser user, string email, string resetCode)
+		{
+			return emailSender.SendEmailAsync(email, "Reset your password", $"Please reset your password using the following code: {resetCode}");
+		}
+
+		public Task SendPasswordResetLinkAsync(TUser user, string email, string resetLink)
+		{
+			return emailSender.SendEmailAsync(email, "Reset your password", $"Please reset your password by following the link: {resetLink}");
 		}
 	}
 }

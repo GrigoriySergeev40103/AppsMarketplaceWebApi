@@ -3,6 +3,7 @@ using System;
 using AppsMarketplaceWebApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AppsMarketplaceWebApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240410181026_AddedDisplayNameToUser")]
+    partial class AddedDisplayNameToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -103,31 +106,6 @@ namespace AppsMarketplaceWebApi.Migrations
                     b.HasKey("AppId", "UserId");
 
                     b.ToTable("AppsOwnershipInfos");
-                });
-
-            modelBuilder.Entity("AppsMarketplaceWebApi.Models.Comment", b =>
-                {
-                    b.Property<string>("CommentId")
-                        .HasColumnType("varchar(255)");
-
-                    b.Property<string>("AppId")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("CommentContent")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("CommenteeId")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("UploadDate")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("CommentId");
-
-                    b.ToTable("Comments");
                 });
 
             modelBuilder.Entity("AppsMarketplaceWebApi.User", b =>
