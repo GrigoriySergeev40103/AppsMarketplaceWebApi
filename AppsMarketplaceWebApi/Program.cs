@@ -271,7 +271,7 @@ app.MapTus("/files", async (httpContext) => new()
 			// I think it's better than having to check that to be deleted App's pic is default pick or not
 			File.Copy(configValues.PathToDefaultAppPic, pathToAppPic);
 
-			toAdd.AppPicturePath = pathToAppPic;
+			toAdd.AppMainPicPath = pathToAppPic;
 			//---------------Set app pic---------------//
 
 			toAdd.UploadDate = DateTime.UtcNow;
@@ -281,7 +281,8 @@ app.MapTus("/files", async (httpContext) => new()
 				AppFileId = file.Id,
 				AppId = toAdd.AppId,
 				Filename = metadata["filename"].GetString(Encoding.UTF8).Trim(),
-				Path = tusStorePath + $"/{file.Id}"
+				Path = tusStorePath + $"/{file.Id}",
+				UploadDate = DateTime.UtcNow
 			};
 
 			await dbContext.Apps.AddAsync(toAdd);
@@ -398,7 +399,8 @@ app.MapTus("/append", async (httpContext) => new()
 				AppFileId = file.Id,
 				AppId = toAppend.AppId,
 				Filename = filename,
-				Path = tusStorePath + $"/{file.Id}"
+				Path = tusStorePath + $"/{file.Id}",
+				UploadDate = DateTime.Now
 			};
 
 			await dbContext.AppFiles.AddAsync(appFile);

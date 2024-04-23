@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
 using tusdotnet.Stores;
 
 namespace AppsMarketplaceWebApi.Controllers
@@ -57,35 +58,44 @@ namespace AppsMarketplaceWebApi.Controllers
             return Ok();
         }
 
-        [Authorize]
         [HttpGet("DownloadAppFileById")]
         public async Task<IActionResult> DownloadAppFileById(string appFileId, [FromServices] AppDbContext dbContext)
         {
-            AppFile? appFile = await dbContext.AppFiles.AsNoTracking().SingleOrDefaultAsync(af => af.AppFileId == appFileId);
+            var appFile = await dbContext.AppFiles.AsNoTracking().Where(af => af.AppFileId == appFileId).Join
+            (
+                dbContext.Apps,
+                af => af.AppId, a => a.AppId,
+                (af, a) => new
+                {
+					af.AppId,
+					af.AppFileId,
+                    af.Filename,
+                    af.Path,
+					a.Price
+                }
+            ).SingleOrDefaultAsync();
 
             if (appFile == null)
                 return NotFound("Couldn't find a file with specified id");
 
-			User? user = await _userManager.GetUserAsync(User);
-
-            if (user == null)
-                return Forbid();
-
-            AppsOwnershipInfo ownershipInfo = new()
+            if(appFile.Price != 0)
             {
-                AppId = appFile.AppId,
-                UserId = user.Id
-            };
+				User? user = await _userManager.GetUserAsync(User);
+                if (user == null)
+                    return BadRequest("You need to buy this app before being able to download it.");
 
-            bool owns = await dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
+				AppsOwnershipInfo ownershipInfo = new()
+				{
+					AppId = appFile.AppId,
+					UserId = user.Id
+				};
 
-            if (!owns)
-                return BadRequest("You do not own the requested app");
+				bool owns = await dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
 
-			bool appDataExists = System.IO.File.Exists(appFile.Path);
-			if (!appDataExists)
-				return NotFound("Couldn't find requested file on the server");
-
+				if (!owns)
+					return BadRequest("You do not own the requested app");
+			}
+            
 			// System.Net.WebUtility.UrlEncode so we can return non ascii characters(headers don't allow non-ascii)
 			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{System.Net.WebUtility.UrlEncode(appFile.Filename)}\"" });
 
@@ -255,68 +265,150 @@ namespace AppsMarketplaceWebApi.Controllers
             if (toDelete == null)
                 return NotFound();
 
-            TusDiskStore terminationStore = _tusDiskStore;
+			TusDiskStore terminationStore = _tusDiskStore;
 
-            // should probably add exception handling here
-            await terminationStore.DeleteFileAsync(toDelete.AppId, default);
-            System.IO.File.Delete(toDelete.AppPicturePath);
+			AppFile[] filesToDelete = await dbContext.AppFiles.Where(af => af.AppId == appId).ToArrayAsync();
+            for (int i = 0; i < filesToDelete.Length; i++)
+            {
+				// should probably add exception handling here
+				await terminationStore.DeleteFileAsync(filesToDelete[i].AppFileId, default);
+			}
 
-            dbContext.Apps.Remove(toDelete);
+            AppPicture[] appPics = await dbContext.AppPictures.Where(ap => ap.AppId == appId).ToArrayAsync();
+            for (int i = 0; i < appPics.Length; i++)
+            {
+                System.IO.File.Delete(appPics[i].Path);
+            }
+            dbContext.AppPictures.RemoveRange(appPics);
+
+			dbContext.Apps.Remove(toDelete);
 
             await dbContext.SaveChangesAsync();
             return Ok();
         }
 
-        [Authorize]
-        [HttpPost("UpdateAppImage")]
-        public async Task<IActionResult> UpdateAppImage(string appId, [FromForm] IFormFile file, [FromServices] AppDbContext dbContext)
+		[Authorize]
+		[HttpPost("UploadAppImage")]
+		public async Task<IActionResult> UploadAppImage(string appId, [FromForm] IFormFile file, [FromServices] AppDbContext dbContext)
+		{
+			App? requestedApp = await dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
+			if (requestedApp == null)
+				return NotFound("Couldn't find an app with given appId.");
+
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest("Failed to find the account of a user trying to upload.");
+
+			if (user.Id != requestedApp.DeveloperId)
+				return Unauthorized("Trying to upload an image for an app you do not own.");
+
+			string? imagesPath = _configuration.GetSection("ImageStore").Value;
+			if (imagesPath == null)
+            {
+                throw new Exception("Failed to find an 'ImageStore' field in the configuration file");
+            }
+
+            string appPicGuid = Guid.NewGuid().ToString();
+
+			string path = imagesPath + $"\\{appPicGuid}.png";
+
+			// Will overwrite previous App's picture if there's one
+			using FileStream fstream = new(path, FileMode.Create);
+			await file.CopyToAsync(fstream);
+
+            AppPicture appPic = new()
+            {
+                AppId = appId,
+                Path = path,
+                PictureId = appPicGuid,
+                UploadDate = DateTime.UtcNow
+            };
+
+            await dbContext.AppPictures.AddAsync(appPic);
+
+			await dbContext.SaveChangesAsync();
+
+			return Ok();
+		}
+
+		[Authorize]
+		[HttpPost("UpdateAppImage")]
+		public async Task<IActionResult> UpdateAppImage(string appId, [FromForm] IFormFile file, [FromServices] AppDbContext dbContext)
+		{
+			App? requestedApp = await dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
+			if (requestedApp == null)
+				return NotFound();
+
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest();
+
+			if (user.Id != requestedApp.DeveloperId)
+				return Unauthorized();
+
+			string? imagesPath = _configuration.GetSection("ImageStore").Value;
+			if (imagesPath == null)
+				return Problem(statusCode: 500);
+
+			string path = imagesPath + $"\\{appId}.png";
+
+			// Will overwrite previous App's picture if there's one
+			using FileStream fstream = new(path, FileMode.Create);
+			await file.CopyToAsync(fstream);
+
+			requestedApp.AppMainPicPath = path;
+			await dbContext.SaveChangesAsync();
+
+			return Ok();
+		}
+
+		[HttpGet("GetAppImage")]
+		public async Task<IActionResult> GetAppImage(string appId, [FromServices] AppDbContext dbContext)
+		{
+			var requestedApp = await dbContext.Apps.AsNoTracking().Select(a => new { id = a.AppId, path = a.AppMainPicPath })
+				.SingleOrDefaultAsync(a => a.id == appId);
+
+			if (requestedApp == null)
+				return NotFound();
+
+			bool picExists = System.IO.File.Exists(requestedApp.path);
+
+			if (!picExists)
+				return NotFound("Couldn't find app's image on the server.");
+
+			return PhysicalFile(requestedApp.path, "image/png");
+		}
+
+		[HttpGet("GetAppPicById")]
+        public async Task<IActionResult> GetAppPicById(string appPicId, [FromServices] AppDbContext dbContext)
         {
-            App? requestedApp = await dbContext.Apps.SingleOrDefaultAsync(a => a.AppId == appId);
-            if (requestedApp == null)
-                return NotFound();
+            var requestedPic = await dbContext.AppPictures.AsNoTracking().SingleOrDefaultAsync(ap => ap.PictureId == appPicId);
 
-            User? user = await _userManager.GetUserAsync(User);
+            if (requestedPic == null)
+            {
+                return NotFound("Could not find a picture with specified picture id");
+            }
 
-            if (user == null)
-                return BadRequest();
-
-            if (user.Id != requestedApp.DeveloperId)
-                return Unauthorized();
-
-            string? imagesPath = _configuration.GetSection("ImageStore").Value;
-            if (imagesPath == null)
-                return Problem(statusCode: 500);
-
-            string path = imagesPath + $"\\{appId}.png";
-
-            // Will overwrite previous App's picture if there's one
-            using FileStream fstream = new(path, FileMode.Create);
-            await file.CopyToAsync(fstream);
-
-            requestedApp.AppPicturePath = path;
-            await dbContext.SaveChangesAsync();
-
-            return Ok();
+            return PhysicalFile(requestedPic.Path, "image/png");
         }
 
-        [HttpGet("GetAppImage")]
-        public async Task<IActionResult> GetAppImage(string appId, [FromServices] AppDbContext dbContext)
-        {
-            var requestedApp = await dbContext.Apps.AsNoTracking().Select(a => new { id = a.AppId, path = a.AppPicturePath })
-                .SingleOrDefaultAsync(a => a.id == appId);
+		[HttpGet("GetAppPicturesIds")]
+		public async Task<IActionResult> GetAppPicturesIds(string appId, [FromServices] AppDbContext dbContext)
+		{
+			App? requestedApp = await dbContext.Apps.AsNoTracking().SingleOrDefaultAsync(a => a.AppId == appId);
 
             if (requestedApp == null)
-                return NotFound();
+                return NotFound("Failed to find an app with given app id");
 
-            bool picExists = System.IO.File.Exists(requestedApp.path);
+            string[] appPicsIds = await dbContext.AppPictures.AsNoTracking().Where(ap => ap.AppId == appId).OrderByDescending(ap => ap.UploadDate)
+                .Select(ap => ap.PictureId).ToArrayAsync();
 
-            if (!picExists)
-                return NotFound("Couldn't find app's image on the server.");
+            return Ok(appPicsIds);
+		}
 
-            return PhysicalFile(requestedApp.path, "image/png");
-        }
-
-        [Authorize]
+		[Authorize]
         [HttpPost("PostComment")]
         public async Task<IActionResult> PostComment([FromQuery] string appId, [FromBody] string commentContent, [FromServices] AppDbContext dbContext)
         {

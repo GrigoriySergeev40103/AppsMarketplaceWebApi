@@ -3,6 +3,7 @@ using System;
 using AppsMarketplaceWebApi;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AppsMarketplaceWebApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240417143947_ChangedToMultipleAppPics")]
+    partial class ChangedToMultipleAppPics
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,10 +26,6 @@ namespace AppsMarketplaceWebApi.Migrations
                 {
                     b.Property<string>("AppId")
                         .HasColumnType("varchar(255)");
-
-                    b.Property<string>("AppMainPicPath")
-                        .IsRequired()
-                        .HasColumnType("longtext");
 
                     b.Property<string>("CategoryName")
                         .IsRequired()

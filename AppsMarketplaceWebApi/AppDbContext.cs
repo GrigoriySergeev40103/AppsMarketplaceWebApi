@@ -11,6 +11,7 @@ namespace AppsMarketplaceWebApi
 		public DbSet<AppsOwnershipInfo> AppsOwnershipInfos { get; set; }
 		public DbSet<AppCategory> AppCategories { get; set; }
 		public DbSet<Comment> Comments { get; set; }
+		public DbSet<AppPicture> AppPictures { get; set; }
 
 		protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 		{
