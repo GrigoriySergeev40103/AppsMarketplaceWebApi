@@ -19,8 +19,8 @@ namespace AppsMarketplaceWebApi.Controllers
         protected readonly IConfiguration _configuration = configuration;
 
         [Authorize]
-        [HttpPost("AcquireAppById")]
-        public async Task<IActionResult> AcquireAppById(string appId, [FromServices] AppDbContext dbContext)
+        [HttpPost("FavoriteAppById")]
+        public async Task<IActionResult> FavoriteAppById(string appId, [FromServices] AppDbContext dbContext)
         {
             App? app = await dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
@@ -28,37 +28,59 @@ namespace AppsMarketplaceWebApi.Controllers
                 return NotFound();
 
             User? user = await _userManager.GetUserAsync(User);
-            User? developer = await dbContext.Users.SingleOrDefaultAsync(u => u.Id == app.DeveloperId);
 
-            if (user == null || developer == null)
+            if (user == null)
                 return BadRequest();
 
-            AppsOwnershipInfo ownershipInfo = new()
+            FavoriteAppsInfo favoriteInfo = new()
             {
                 AppId = appId,
                 UserId = user.Id
             };
 
-            bool alreadyOwns = await dbContext.AppsOwnershipInfos.ContainsAsync(ownershipInfo);
+            bool alreadyFavorite = await dbContext.FavoriteAppsInfo.ContainsAsync(favoriteInfo);
 
-            if (alreadyOwns)
-                return BadRequest("You already own that app");
+            if (alreadyFavorite)
+                return BadRequest("You've already favorited this app");
 
-            if (user.Balance < app.Price)
-                return BadRequest("Not enough money");
-
-            // Not really sure if I even should be using decimal for money operations(floating point arith innaccurate nature?) but it is what it is right now
-            // should make sure to not overflow too
-            user.Balance -= app.Price;
-            developer.Balance += app.Price;
-
-            await dbContext.AppsOwnershipInfos.AddAsync(ownershipInfo);
+            await dbContext.FavoriteAppsInfo.AddAsync(favoriteInfo);
             await dbContext.SaveChangesAsync();
 
             return Ok();
         }
 
-        [HttpGet("DownloadAppFileById")]
+		[Authorize]
+		[HttpPost("UnfavoriteAppById")]
+		public async Task<IActionResult> UnfavoriteAppById(string appId, [FromServices] AppDbContext dbContext)
+		{
+			App? app = await dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
+
+			if (app == null)
+				return NotFound();
+
+			User? user = await _userManager.GetUserAsync(User);
+
+			if (user == null)
+				return BadRequest();
+
+			FavoriteAppsInfo favoriteInfo = new()
+			{
+				AppId = appId,
+				UserId = user.Id
+			};
+
+			bool alreadyFavorite = await dbContext.FavoriteAppsInfo.ContainsAsync(favoriteInfo);
+
+			if (!alreadyFavorite)
+				return BadRequest("You haven't favorited this app");
+
+			dbContext.FavoriteAppsInfo.Remove(favoriteInfo);
+			await dbContext.SaveChangesAsync();
+
+			return Ok();
+		}
+
+		[HttpGet("DownloadAppFileById")]
         public async Task<IActionResult> DownloadAppFileById(string appFileId, [FromServices] AppDbContext dbContext)
         {
             var appFile = await dbContext.AppFiles.AsNoTracking().Where(af => af.AppFileId == appFileId).Join
@@ -70,31 +92,12 @@ namespace AppsMarketplaceWebApi.Controllers
 					af.AppId,
 					af.AppFileId,
                     af.Filename,
-                    af.Path,
-					a.Price
+                    af.Path
                 }
             ).SingleOrDefaultAsync();
 
             if (appFile == null)
                 return NotFound("Couldn't find a file with specified id");
-
-            if(appFile.Price != 0)
-            {
-				User? user = await _userManager.GetUserAsync(User);
-                if (user == null)
-                    return BadRequest("You need to buy this app before being able to download it.");
-
-				AppsOwnershipInfo ownershipInfo = new()
-				{
-					AppId = appFile.AppId,
-					UserId = user.Id
-				};
-
-				bool owns = await dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
-
-				if (!owns)
-					return BadRequest("You do not own the requested app");
-			}
             
 			// System.Net.WebUtility.UrlEncode so we can return non ascii characters(headers don't allow non-ascii)
 			HttpContext.Response.Headers.Append("Content-Disposition", new[] { $"attachment; filename=\"{System.Net.WebUtility.UrlEncode(appFile.Filename)}\"" });
@@ -111,7 +114,7 @@ namespace AppsMarketplaceWebApi.Controllers
             if (user == null)
                 return BadRequest();
 
-            var res = await dbContext.AppsOwnershipInfos.AsNoTracking().Where(oi => oi.UserId == user.Id).Join
+            var res = await dbContext.FavoriteAppsInfo.AsNoTracking().Where(oi => oi.UserId == user.Id).Join
             (
                 dbContext.Apps,
                 oi => oi.AppId, app => app.AppId,
@@ -120,7 +123,6 @@ namespace AppsMarketplaceWebApi.Controllers
                     AppId = app.AppId,
                     UploadDate = app.UploadDate,
                     DeveloperId = app.DeveloperId,
-                    Price = app.Price,
                     CategoryName = app.CategoryName,
                     Description = app.Description,
                     SpecialDescription = app.SpecialDescription,
@@ -139,7 +141,6 @@ namespace AppsMarketplaceWebApi.Controllers
 				AppId = a.AppId,
 				UploadDate = a.UploadDate,
 				DeveloperId = a.DeveloperId,
-				Price = a.Price,
 				CategoryName = a.CategoryName,
 				Description = a.Description,
 				SpecialDescription = a.SpecialDescription,
@@ -154,7 +155,7 @@ namespace AppsMarketplaceWebApi.Controllers
 
 		[Authorize]
         [HttpGet("IsOwned")]
-        public async Task<IActionResult> IsOwned(string appId, [FromServices] AppDbContext dbContext)
+        public async Task<IActionResult> IsFavorite(string appId, [FromServices] AppDbContext dbContext)
         {
             App? app = await dbContext.Apps.SingleOrDefaultAsync(s => s.AppId == appId);
 
@@ -166,13 +167,13 @@ namespace AppsMarketplaceWebApi.Controllers
             if (user == null)
                 return BadRequest();
 
-            AppsOwnershipInfo ownershipInfo = new()
+            FavoriteAppsInfo ownershipInfo = new()
             {
                 AppId = appId,
                 UserId = user.Id
             };
 
-            bool owns = await dbContext.AppsOwnershipInfos.AsNoTracking().ContainsAsync(ownershipInfo);
+            bool owns = await dbContext.FavoriteAppsInfo.AsNoTracking().ContainsAsync(ownershipInfo);
 
             if (owns)
                 return Ok();
@@ -188,7 +189,6 @@ namespace AppsMarketplaceWebApi.Controllers
                 AppId = a.AppId,
                 UploadDate = a.UploadDate,
                 DeveloperId = a.DeveloperId,
-                Price = a.Price,
                 CategoryName = a.CategoryName,
                 Description = a.Description,
                 SpecialDescription = a.SpecialDescription,
@@ -214,7 +214,6 @@ namespace AppsMarketplaceWebApi.Controllers
                 AppId = app.AppId,
                 UploadDate = app.UploadDate,
                 DeveloperId = app.DeveloperId,
-                Price = app.Price,
                 CategoryName = app.CategoryName,
                 Description = app.Description,
                 SpecialDescription = app.SpecialDescription,
@@ -245,7 +244,6 @@ namespace AppsMarketplaceWebApi.Controllers
 				AppId = app.AppId,
 				UploadDate = app.UploadDate,
 				DeveloperId = app.DeveloperId,
-				Price = app.Price,
 				CategoryName = app.CategoryName,
 				Description = app.Description,
 				SpecialDescription = app.SpecialDescription,

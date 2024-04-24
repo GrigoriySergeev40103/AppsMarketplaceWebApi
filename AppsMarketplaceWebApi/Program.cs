@@ -164,30 +164,6 @@ app.MapTus("/files", async (httpContext) => new()
 				}
 			}
 
-			hasData = ctx.Metadata.TryGetValue("price", out valueData);
-			if (hasData)
-			{
-				bool parsed = decimal.TryParse(valueData!.GetString(Encoding.UTF8), out decimal appPrice);
-				if (parsed)
-				{
-					if (appPrice < 0)
-					{
-						FailRequest("App's price can not be < 0");
-						return;
-					}
-				}
-				else
-				{
-					FailRequest("Invalid price value format(couldn't parse to a decimal)");
-					return;
-				}
-			}
-			else
-			{
-				FailRequest("Price metadata must be specified");
-				return;
-			}
-
 			hasData = ctx.Metadata.TryGetValue("category_name", out valueData);
 			if (hasData)
 			{
@@ -254,7 +230,6 @@ app.MapTus("/files", async (httpContext) => new()
 			toAdd.Description		 = metadata["description"].GetString(Encoding.UTF8).Trim();
 			toAdd.SpecialDescription = metadata["spec_desc"].GetString(Encoding.UTF8).Trim();
 			toAdd.CategoryName		 = metadata["category_name"].GetString(Encoding.UTF8).Trim();
-			toAdd.Price				 = decimal.Parse(metadata["price"].GetString(Encoding.UTF8).Trim());
 
             AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();
             if (dbContext == null)

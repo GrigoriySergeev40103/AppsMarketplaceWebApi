@@ -7,7 +7,5 @@ namespace AppsMarketplaceWebApi
 		public string DisplayName { get; set; } = null!;
 
 		public string PathToAvatarPic { get; set; } = null!;
-
-		public decimal Balance { get; set; }
 	}
 }

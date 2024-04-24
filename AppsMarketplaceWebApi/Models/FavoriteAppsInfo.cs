@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace AppsMarketplaceWebApi.Models
 {
 	[PrimaryKey(nameof(AppId), nameof(UserId))]
-	public class AppsOwnershipInfo
+	public class FavoriteAppsInfo
 	{
 		public string AppId { get; set; } = null!;
 

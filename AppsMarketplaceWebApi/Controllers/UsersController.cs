@@ -63,8 +63,7 @@ namespace AppsMarketplaceWebApi.Controllers
 			PersonalUserDTO toReturn = new()
 			{
 				Id = user.Id,
-				UserName = user.UserName,
-                Balance = user.Balance
+				UserName = user.UserName
 			};
 
 			return Ok(toReturn);
