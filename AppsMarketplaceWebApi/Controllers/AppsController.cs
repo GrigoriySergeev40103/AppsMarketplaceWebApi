@@ -434,7 +434,21 @@ namespace AppsMarketplaceWebApi.Controllers
             return Ok();
         }
 
-        [HttpGet("GetAppComments")]
+		[Authorize]
+		[HttpDelete("DeleteComment")]
+		public async Task<IActionResult> DeleteComment([FromQuery] string commentId, [FromServices] AppDbContext dbContext)
+		{
+			Comment? toDelete = await dbContext.Comments.AsNoTracking().SingleOrDefaultAsync(c => c.CommentId == commentId);
+			if (toDelete == null)
+				return NotFound("Could not find an app that you want to leave a comment on.");
+
+			dbContext.Comments.Remove(toDelete);
+			await dbContext.SaveChangesAsync();
+
+			return Ok();
+		}
+
+		[HttpGet("GetAppComments")]
         public async IAsyncEnumerable<Comment> GetAppComments(string appId, [FromServices] AppDbContext dbContext)
         {
             var comments = dbContext.Comments.AsNoTracking().Where(c => c.AppId == appId).OrderByDescending(c => c.UploadDate).AsAsyncEnumerable();

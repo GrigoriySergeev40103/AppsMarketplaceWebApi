@@ -353,6 +353,14 @@ app.MapTus("/append", async (httpContext) => new()
 				return;
 			}
 
+			User? developer = await userManager.GetUserAsync(eventContext.HttpContext.User);
+			if (developer == null)
+			{
+				Console.WriteLine("File was uploaded succesfully but couldn't retrieve user of the uploaded file");
+				await DiscardFile();
+				return;
+			}
+
 			AppDbContext? dbContext = httpContext.RequestServices.GetService<AppDbContext>();
 			if (dbContext == null)
 			{
